@@ -641,7 +641,7 @@ function start(){
   var app=document.getElementById('app'), errEl=document.getElementById('err'), pickEl=document.getElementById('picker');
   var RAW='https://raw.githubusercontent.com/jamesonespence/Gamescore/main/';
   var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var timer=null, busy=false, sel=null, games=null, saved=[], listSig='', ui={view:'score',per:'all'}, lastD=null, lastTxt='';
+  var timer=null, busy=false, sel=null, games=null, saved=[], listSig='', team='', todayStr='', ui={view:'score',per:'all'}, lastD=null, lastTxt='';
   try{var qg=new URLSearchParams(location.search).get('game'); if(qg&&/^\d{10}$/.test(qg)) sel=qg;}catch(e){}
   function showErr(msg){errEl.textContent=msg;errEl.hidden=false;}
   function clearErr(){errEl.hidden=true;}
@@ -653,30 +653,65 @@ function start(){
     });
   }
   function isSaved(id){return saved.indexOf(Number(id))>=0;}
+  function tm(g){
+    try{return new Date(g.start).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});}catch(e){return 'upcoming';}
+  }
   function label(g){
-    var d=String(g.date||'').split('-'), dt=d.length===3?(MONTHS[+d[1]-1]+' '+(+d[2])):'';
     var s=g.state, tail='';
     if(s==='LIVE'||s==='CRIT') tail=' - LIVE '+(g.as==null?0:g.as)+'-'+(g.hs==null?0:g.hs);
     else if(s==='OFF'||s==='FINAL') tail=' - Final '+(g.as==null?'':g.as)+'-'+(g.hs==null?'':g.hs);
-    else tail=' - upcoming';
-    return dt+' '+g.away+' at '+g.home+tail;
+    else tail=' - '+(g.start?tm(g):'upcoming');
+    return g.away+' at '+g.home+tail;
   }
+  function dayLabel(ds,today){
+    var d=String(ds||'').split('-'); if(d.length!==3) return ds||'';
+    var t=MONTHS[+d[1]-1]+' '+(+d[2]);
+    if(ds===today) return 'Today - '+t;
+    var dt=new Date(+d[0],+d[1]-1,+d[2]), td=String(today||'').split('-');
+    if(td.length===3){
+      var diff=Math.round((dt-new Date(+td[0],+td[1]-1,+td[2]))/86400000);
+      if(diff===1) return 'Tomorrow - '+t;
+      if(diff===-1) return 'Yesterday - '+t;
+    }
+    return t;
+  }
+  function mine(g){return g.away===team||g.home===team;}
   function autoPick(){
     var c=(games||[]).filter(function(g){return isSaved(g.id);});
     if(!c.length) return null;
-    var live=c.filter(function(g){return g.state==='LIVE'||g.state==='CRIT';});
+    function rank(a,b){
+      var ma=mine(a)?0:1, mb=mine(b)?0:1; if(ma!==mb) return ma-mb;
+      var sa=a.start||'', sb=b.start||''; return sa<sb?1:(sa>sb?-1:0);
+    }
+    var live=c.filter(function(g){return g.state==='LIVE'||g.state==='CRIT';}).sort(rank);
     if(live.length) return String(live[0].id);
-    c.sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
-    return String(c[0].id);
+    var tdy=c.filter(function(g){return g.date===todayStr&&mine(g);}).sort(rank);
+    if(tdy.length) return String(tdy[0].id);
+    var fin=c.filter(function(g){return g.state==='OFF'||g.state==='FINAL';}).sort(rank);
+    if(fin.length) return String(fin[0].id);
+    return String(c.sort(rank)[0].id);
   }
   function buildPicker(){
     if(!games||!games.length) return;
     var sig=games.map(function(g){return g.id+':'+g.state+':'+g.as+':'+g.hs;}).join('|')+'#'+saved.join(',')+'#'+sel;
     if(sig===listSig) return;
     listSig=sig;
-    var opts=games.map(function(g){
-      var ok=isSaved(g.id);
-      return '<option value="'+g.id+'"'+(ok?'':' disabled')+(String(g.id)===String(sel)?' selected':'')+'>'+esc(label(g))+(ok?'':' (not available yet)')+'</option>';
+    var days={}, order=[];
+    games.forEach(function(g){var k=g.date||''; if(!days[k]){days[k]=[];order.push(k);} days[k].push(g);});
+    order.sort(function(x,y){
+      var fx=x>=todayStr, fy=y>=todayStr;
+      if(fx!==fy) return fx?-1:1;
+      return fx?(x<y?-1:1):(x<y?1:-1);
+    });
+    var opts=order.map(function(k){
+      var items=days[k].slice().sort(function(a,b){
+        var ma=mine(a)?0:1, mb=mine(b)?0:1; if(ma!==mb) return ma-mb;
+        var sa=a.start||'', sb=b.start||''; return sa<sb?-1:(sa>sb?1:0);
+      });
+      return '<optgroup label="'+esc(dayLabel(k,todayStr))+'">'+items.map(function(g){
+        var ok=isSaved(g.id);
+        return '<option value="'+g.id+'"'+(ok?'':' disabled')+(String(g.id)===String(sel)?' selected':'')+'>'+(mine(g)?'* ':'')+esc(label(g))+(ok?'':' (not available yet)')+'</option>';
+      }).join('')+'</optgroup>';
     }).join('');
     pickEl.innerHTML='<label for="gamepick" class="sub">Game</label><select id="gamepick">'+opts+'</select>';
     pickEl.hidden=false;
@@ -688,7 +723,7 @@ function start(){
   }
   function load(){
     if(busy) return; busy=true;
-    getJSON('games.json').then(function(j){games=j.games||[];saved=j.saved||[];},function(){games=null;}).then(function(){
+    getJSON('games.json').then(function(j){games=j.games||[];saved=j.saved||[];team=j.team||'';todayStr=j.today||'';},function(){games=null;}).then(function(){
       if(!sel) sel=autoPick();
       buildPicker();
       if(!sel) throw new Error('No saved games yet. Run the Update game data workflow once.');
