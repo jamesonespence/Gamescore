@@ -147,9 +147,10 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.6</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <div class="verbar"><span>GameScore v1.7</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
   <section id="notes" class="panel notes" hidden>
     <h3>Release notes</h3>
+    <h4>v1.7</h4><ul><li>Much fresher data: the updater now stays running during games and re-fetches every 30 seconds instead of waiting for the slow GitHub schedule. Data is published to a separate branch so it does not clog the repo.</li></ul>
     <h4>v1.6</h4><ul><li>Release notes are now built into the page. Tap "Release notes" at the top to open or close them.</li></ul>
     <h4>v1.5</h4><ul><li>Finished games no longer show a growing "old" timer; the sync bar says the game is over and when the final stats were saved.</li></ul>
     <h4>v1.4</h4><ul><li>Time on ice for every skater on the Players tab: total, power play (PP) and shorthanded (SH). PP and SH are estimates.</li><li>Version number at the top and a sync bar showing how far behind the data is.</li><li>Players tab shows every skater, sorted by points, shots, hits, blocks, faceoff wins and ice time.</li></ul>
@@ -691,7 +692,7 @@ function renderHTML(d,updatedText,ui){
 /* ---- browser wiring ---- */
 function start(){
   var app=document.getElementById('app'), errEl=document.getElementById('err'), pickEl=document.getElementById('picker');
-  var RAW='https://raw.githubusercontent.com/jamesonespence/Gamescore/main/';
+  var RAW='https://raw.githubusercontent.com/jamesonespence/Gamescore/data/';
   var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var timer=null, busy=false, sel=null, games=null, saved=[], listSig='', team='', todayStr='', ui={view:'score',per:'all'}, lastD=null, lastTxt='';
   try{var qg=new URLSearchParams(location.search).get('game'); if(qg&&/^\d{10}$/.test(qg)) sel=qg;}catch(e){}
@@ -787,7 +788,7 @@ function start(){
       var now=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});
       var ft='';
       try{ft=d.fetchedAt?new Date(d.fetchedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';}catch(e){}
-      lastD=d; lastTxt='Updated '+now+' - using the GitHub copy of the NHL data'+(ft?', copied at '+ft:'')+', refreshed about every 5 minutes';
+      lastD=d; lastTxt='Updated '+now+' - using the GitHub copy of the NHL data'+(ft?', copied at '+ft:'')+', refreshed about every 30 seconds during games';
       app.innerHTML=renderHTML(d,lastTxt,ui);
       tick();
       clearErr();
