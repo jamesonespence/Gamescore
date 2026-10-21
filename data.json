@@ -68,7 +68,7 @@
     },
     "abbrev": "CBJ",
     "score": 2,
-    "sog": 37,
+    "sog": 38,
     "logo": "https://assets.nhle.com/logos/nhl/svg/CBJ_light.svg",
     "darkLogo": "https://assets.nhle.com/logos/nhl/svg/CBJ_dark.svg",
     "placeName": {
@@ -5282,18 +5282,19 @@
       "timeRemaining": "18:31",
       "situationCode": "1551",
       "homeTeamDefendingSide": "left",
-      "typeCode": 507,
-      "typeDescKey": "missed-shot",
+      "typeCode": 506,
+      "typeDescKey": "shot-on-goal",
       "sortOrder": 557,
       "details": {
         "xCoord": 49,
         "yCoord": 8,
         "zoneCode": "O",
-        "reason": "wide-left",
         "shotType": "snap",
         "shootingPlayerId": 8478460,
         "goalieInNetId": 8476932,
-        "eventOwnerTeamId": 29
+        "eventOwnerTeamId": 29,
+        "awaySOG": 14,
+        "homeSOG": 25
       }
     },
     {
@@ -5449,7 +5450,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 14,
-        "homeSOG": 25
+        "homeSOG": 26
       }
     },
     {
@@ -5723,7 +5724,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 14,
-        "homeSOG": 26
+        "homeSOG": 27
       }
     },
     {
@@ -5749,7 +5750,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 14,
-        "homeSOG": 27
+        "homeSOG": 28
       }
     },
     {
@@ -5798,7 +5799,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 14,
-        "homeSOG": 28
+        "homeSOG": 29
       }
     },
     {
@@ -5824,7 +5825,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 14,
-        "homeSOG": 29
+        "homeSOG": 30
       }
     },
     {
@@ -6065,7 +6066,7 @@
         "goalieInNetId": 8475660,
         "eventOwnerTeamId": 10,
         "awaySOG": 15,
-        "homeSOG": 29
+        "homeSOG": 30
       }
     },
     {
@@ -6133,7 +6134,7 @@
         "goalieInNetId": 8475660,
         "eventOwnerTeamId": 10,
         "awaySOG": 16,
-        "homeSOG": 29
+        "homeSOG": 30
       }
     },
     {
@@ -6430,7 +6431,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 16,
-        "homeSOG": 30
+        "homeSOG": 31
       }
     },
     {
@@ -6456,7 +6457,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 16,
-        "homeSOG": 31
+        "homeSOG": 32
       }
     },
     {
@@ -6879,7 +6880,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 16,
-        "homeSOG": 32
+        "homeSOG": 33
       }
     },
     {
@@ -7149,7 +7150,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 16,
-        "homeSOG": 33
+        "homeSOG": 34
       }
     },
     {
@@ -7175,7 +7176,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 16,
-        "homeSOG": 34
+        "homeSOG": 35
       }
     },
     {
@@ -7201,7 +7202,7 @@
         "goalieInNetId": 8476932,
         "eventOwnerTeamId": 29,
         "awaySOG": 16,
-        "homeSOG": 35
+        "homeSOG": 36
       }
     },
     {
@@ -7780,5 +7781,5 @@
   ],
   "regPeriods": 3,
   "summary": {},
-  "fetchedAt": "2026-10-21T15:42:13Z"
+  "fetchedAt": "2026-10-21T16:16:02Z"
 }
