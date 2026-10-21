@@ -92,11 +92,15 @@ tr:last-child td{border-bottom:0}
 .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-bottom:4px}
 .legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 .h3m{font-size:16px;margin-top:18px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.pickrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pickrow select{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px;min-width:0;max-width:100%;flex:1 1 220px}
+.pickrow select:focus-visible{outline:2px solid var(--a);outline-offset:2px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
+  <div id="picker" class="pickrow" hidden></div>
   <div id="app"><section class="panel"><p id="boot" style="margin:0">Loading live data...</p></section></div>
   <noscript><section class="panel">This card needs JavaScript to load live data.</section></noscript>
 </div>
@@ -446,59 +450,75 @@ function renderHTML(d,updatedText){
 
 /* ---- browser wiring ---- */
 function start(){
-  var app=document.getElementById('app'), errEl=document.getElementById('err'), timer=null, busy=false;
+  var app=document.getElementById('app'), errEl=document.getElementById('err'), pickEl=document.getElementById('picker');
+  var RAW='https://raw.githubusercontent.com/jamesonespence/Gamescore/main/';
+  var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var timer=null, busy=false, sel=null, games=null, saved=[], listSig='';
+  try{var qg=new URLSearchParams(location.search).get('game'); if(qg&&/^\d{10}$/.test(qg)) sel=qg;}catch(e){}
   function showErr(msg){errEl.textContent=msg;errEl.hidden=false;}
   function clearErr(){errEl.hidden=true;}
-  function schedule(ms){if(timer)clearTimeout(timer);if(ms)timer=setTimeout(load,ms);}
-  /* Routes: the NHL directly first, then public relays that add the browser permission headers. */
-  var REPO_JSON='https://raw.githubusercontent.com/jamesonespence/Gamescore/main/data.json';
-  var ROUTES=[
-    {name:'direct',make:function(u){return u;}},
-    {name:'github',make:function(u){return REPO_JSON+'?t='+Date.now();}}
-  ];
-  var preferred=0;
-  function tryRoute(i){
-    var r=ROUTES[i], ctl=(typeof AbortController!=='undefined')?new AbortController():null;
-    var to=setTimeout(function(){if(ctl)ctl.abort();},10000);
-    return fetch(r.make(URL_PBP),{cache:'no-store',signal:ctl?ctl.signal:undefined}).then(function(resp){
-      clearTimeout(to);
-      if(!resp.ok) throw new Error('HTTP '+resp.status);
-      return resp.json();
-    }).then(function(d){
-      if(!d||!d.gameState) throw new Error('unexpected data');
-      return {d:d,via:r.name};
-    },function(e){clearTimeout(to);throw e;});
+  function schedule(ms){if(timer)clearTimeout(timer);timer=ms?setTimeout(load,ms):null;}
+  function getJSON(path){
+    return fetch(RAW+path+'?t='+Date.now(),{cache:'no-store'}).then(function(r){
+      if(!r.ok){var e=new Error('HTTP '+r.status);e.status=r.status;throw e;}
+      return r.json();
+    });
   }
-  function getData(){
-    var order=[preferred], errs=[], i;
-    for(i=0;i<ROUTES.length;i++) if(i!==preferred) order.push(i);
-    function next(k){
-      if(k>=order.length) return Promise.reject(new Error(errs.join('; ')));
-      return tryRoute(order[k]).then(function(res){preferred=order[k];return res;},function(e){
-        errs.push(ROUTES[order[k]].name+': '+(e&&e.message?e.message:'failed'));
-        return next(k+1);
-      });
-    }
-    return next(0);
+  function isSaved(id){return saved.indexOf(Number(id))>=0;}
+  function label(g){
+    var d=String(g.date||'').split('-'), dt=d.length===3?(MONTHS[+d[1]-1]+' '+(+d[2])):'';
+    var s=g.state, tail='';
+    if(s==='LIVE'||s==='CRIT') tail=' - LIVE '+(g.as==null?0:g.as)+'-'+(g.hs==null?0:g.hs);
+    else if(s==='OFF'||s==='FINAL') tail=' - Final '+(g.as==null?'':g.as)+'-'+(g.hs==null?'':g.hs);
+    else tail=' - upcoming';
+    return dt+' '+g.away+' at '+g.home+tail;
+  }
+  function autoPick(){
+    var c=(games||[]).filter(function(g){return isSaved(g.id);});
+    if(!c.length) return null;
+    var live=c.filter(function(g){return g.state==='LIVE'||g.state==='CRIT';});
+    if(live.length) return String(live[0].id);
+    c.sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0);});
+    return String(c[0].id);
+  }
+  function buildPicker(){
+    if(!games||!games.length) return;
+    var sig=games.map(function(g){return g.id+':'+g.state+':'+g.as+':'+g.hs;}).join('|')+'#'+saved.join(',')+'#'+sel;
+    if(sig===listSig) return;
+    listSig=sig;
+    var opts=games.map(function(g){
+      var ok=isSaved(g.id);
+      return '<option value="'+g.id+'"'+(ok?'':' disabled')+(String(g.id)===String(sel)?' selected':'')+'>'+esc(label(g))+(ok?'':' (not available yet)')+'</option>';
+    }).join('');
+    pickEl.innerHTML='<label for="gamepick" class="sub">Game</label><select id="gamepick">'+opts+'</select>';
+    pickEl.hidden=false;
+    document.getElementById('gamepick').addEventListener('change',function(ev){
+      sel=ev.target.value;
+      try{history.replaceState(null,'','?game='+sel);}catch(e){}
+      load();
+    });
   }
   function load(){
     if(busy) return; busy=true;
-    getData().then(function(res){
-      var d=res.d;
+    getJSON('games.json').then(function(j){games=j.games||[];saved=j.saved||[];},function(){games=null;}).then(function(){
+      if(!sel) sel=autoPick();
+      buildPicker();
+      if(!sel) throw new Error('No saved games yet. Run the Update game data workflow once.');
+      return getJSON('data/'+sel+'.json').then(null,function(e){
+        if(e&&e.status===404) throw new Error('No saved copy of this game yet.');
+        throw e;
+      });
+    }).then(function(d){
       var now=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});
-      var note='Updated '+now;
-      if(res.via==='github'){
-        var ft='';
-        try{ft=d.fetchedAt?new Date(d.fetchedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';}catch(e){}
-        note+=' - using the GitHub copy of the NHL data'+(ft?', copied at '+ft:'')+', refreshed about every 5 minutes';
-      }
-      app.innerHTML=renderHTML(d,note);
+      var ft='';
+      try{ft=d.fetchedAt?new Date(d.fetchedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';}catch(e){}
+      app.innerHTML=renderHTML(d,'Updated '+now+' - using the GitHub copy of the NHL data'+(ft?', copied at '+ft:'')+', refreshed about every 5 minutes');
       var b=document.getElementById('refresh'); if(b) b.addEventListener('click',function(){load();});
       clearErr();
       var s=gameStatus(d);
       schedule(s==='final'?0:(s==='pre'?POLL_PRE:POLL_LIVE));
     }).catch(function(e){
-      showErr('Could not load live data. Tried: '+(e&&e.message?e.message:'network error')+'. Retrying in 30 seconds.');
+      showErr((e&&e.message?e.message:'Could not load the saved data')+' Retrying in 30 seconds.');
       schedule(POLL_LIVE);
     }).then(function(){busy=false;});
   }
