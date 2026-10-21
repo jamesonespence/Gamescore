@@ -111,6 +111,24 @@ td.tot{font-weight:600}
 .gloss summary{cursor:pointer;font-family:var(--f-disp);font-weight:800;font-size:18px;letter-spacing:.04em;text-transform:uppercase}
 .gloss dt{font-weight:600;margin-top:10px}
 .gloss dd{margin:2px 0 0;color:var(--muted);font-size:14px}
+table.ls th,table.ls td{padding:7px 2px;font-size:14px;text-align:center}
+table.ls th{letter-spacing:.02em}
+table.ls th:first-child,table.ls td:first-child{text-align:left;padding-left:6px}
+table.ls tr.g1 th{border-bottom:0;padding-bottom:0}
+table.ls th.gl{text-align:center;color:var(--fg);font-family:var(--f-disp);font-size:14px;letter-spacing:.1em}
+table.ls .gr{border-left:1px solid var(--line)}
+table.ls td.tot{background:var(--track)}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.pn{font-family:var(--f-disp);font-weight:800;font-size:19px;letter-spacing:.06em;text-transform:uppercase}
+.pscore i{font-style:normal;color:var(--muted)}
+.ev{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ev li{display:grid;grid-template-columns:46px 44px 1fr;gap:10px;align-items:start;padding:8px 0;border-bottom:1px solid var(--line)}
+.ev li:last-child{border-bottom:0}
+.ev .tm{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px;padding-top:2px}
+.ev .tx{display:flex;flex-direction:column;min-width:0}
+.ev .l1{overflow-wrap:anywhere}
+.ev .l2{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.ev .tag{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;color:var(--muted);vertical-align:1px}
 </style>
 </head>
 <body>
@@ -361,25 +379,29 @@ function reached(R,key){
 /* Section: scoring and penalties grouped by period */
 function scoringByPeriod(R,d,an,hn,status){
   if(status==='pre') return '<p class="note">No scoring yet.</p>';
-  var nm=function(id,tot){return id?(esc((R.roster[id]||{}).name||('#'+id))+(tot!=null?' ('+tot+')':'')):'';};
+  var nm=function(id){return id?esc((R.roster[id]||{}).name||('#'+id)):'';};
   var out='';
   for(var i=1;i<=R.nPer;i++){
     var gs=R.goals.filter(function(g){return g.per===i;});
     var ps=R.pens.filter(function(p){return p.per===i;});
     var ga=gs.filter(function(g){return g.side==='a';}).length, gh=gs.length-ga;
-    out+='<div class="pgrp"><h3 class="ph">'+esc(perLong(i,i>3?'OT':''))+'<span class="pscore"><span class="ta">'+an+'</span> '+ga+' - '+gh+' <span class="tb">'+hn+'</span></span></h3>';
-    out+='<div class="subh">Goals</div>';
-    if(!gs.length) out+='<p class="note" style="margin:2px 0 6px">No goals.</p>';
-    else out+='<ul class="plays">'+gs.map(function(g){
-      var strength=g.en?'empty net':(g.state==='pp'?'power play':(g.state==='sh'?'shorthanded':'even strength'));
-      var as=[]; if(g.a1)as.push(nm(g.a1,g.a1t)); if(g.a2)as.push(nm(g.a2,g.a2t));
-      return '<li><span class="badge '+(g.side==='a'?'a':'b')+'">'+(g.side==='a'?an:hn)+'</span><span><b>'+nm(g.scorer,g.stotal)+'</b>, '+strength+', '+esc(g.time)+(g.shot?' ('+esc(g.shot)+')':'')+'. '+(as.length?'Assists: '+as.join(', ')+'.':'Unassisted.')+'</span></li>';
-    }).join('')+'</ul>';
-    out+='<div class="subh">Penalties</div>';
-    if(!ps.length) out+='<p class="note" style="margin:2px 0 0">No penalties.</p>';
-    else out+='<ul class="plays">'+ps.map(function(p){
-      return '<li><span class="badge '+(p.side==='a'?'a':'b')+'">'+(p.side==='a'?an:hn)+'</span><span>'+esc(p.who)+', '+esc(cap(p.desc))+', '+p.dur+' min, '+esc(p.time)+'</span></li>';
-    }).join('')+'</ul>';
+    out+='<div class="pgrp"><div class="ph"><span class="pn">'+esc(perLong(i,i>3?'OT':''))+'</span><span class="pscore"><span class="ta">'+an+'</span> '+ga+' <i>-</i> '+gh+' <span class="tb">'+hn+'</span></span></div>';
+    if(!gs.length&&!ps.length){out+='<p class="note" style="margin:6px 0 0">No goals or penalties.</p></div>';continue;}
+    if(gs.length){
+      out+='<div class="subh">Goals</div><ul class="ev">'+gs.map(function(g){
+        var tag=g.en?'EN':(g.state==='pp'?'PP':(g.state==='sh'?'SH':''));
+        var as=[]; if(g.a1)as.push(nm(g.a1)+(g.a1t!=null?' ('+g.a1t+')':'')); if(g.a2)as.push(nm(g.a2)+(g.a2t!=null?' ('+g.a2t+')':''));
+        var meta=(as.length?'Assists: '+as.join(', '):'Unassisted')+(g.shot?' - '+esc(cap(g.shot)):'');
+        return '<li class="goal"><span class="tm">'+esc(g.time)+'</span><span class="badge '+(g.side==='a'?'a':'b')+'">'+(g.side==='a'?an:hn)+'</span>'
+          +'<span class="tx"><span class="l1"><b>'+nm(g.scorer)+'</b>'+(g.stotal!=null?' ('+g.stotal+')':'')+(tag?' <em class="tag">'+tag+'</em>':'')+'</span><span class="l2">'+meta+'</span></span></li>';
+      }).join('')+'</ul>';
+    }
+    if(ps.length){
+      out+='<div class="subh">Penalties</div><ul class="ev">'+ps.map(function(p){
+        return '<li class="pen"><span class="tm">'+esc(p.time)+'</span><span class="badge '+(p.side==='a'?'a':'b')+'">'+(p.side==='a'?an:hn)+'</span>'
+          +'<span class="tx"><span class="l1">'+esc(p.who)+'</span><span class="l2">'+esc(cap(p.desc))+' - '+p.dur+' min</span></span></li>';
+      }).join('')+'</ul>';
+    }
     out+='</div>';
   }
   return out;
@@ -390,21 +412,34 @@ function lineScore(R,d,an,hn,status){
   var A=d.awayTeam, H=d.homeTeam;
   var sa=A.score==null?0:A.score, sh=H.score==null?0:H.score;
   var cols=periodCols(R).filter(function(c){return c[0]!=='all';});
-  var hdr='<th>Team</th>', ra='<td class="ta"><b>'+an+'</b></td>', rh='<td class="tb"><b>'+hn+'</b></td>';
-  cols.forEach(function(c){
-    hdr+='<th>'+c[1]+'</th>';
-    var ok=status!=='pre'&&reached(R,c[0])&&(c[0]==='ot'||+c[0]<=(pd.number||1)||status==='final');
-    ra+='<td>'+(ok?R.S[c[0]].a.g:'-')+'</td>'; rh+='<td>'+(ok?R.S[c[0]].h.g:'-')+'</td>';
-  });
-  hdr+='<th>T</th><th>SOG</th>';
-  ra+='<td><b>'+sa+'</b></td><td>'+R.S.all.a.sog+'</td>'; rh+='<td><b>'+sh+'</b></td><td>'+R.S.all.h.sog+'</td>';
-  return '<div class="tw"><table><thead><tr>'+hdr+'</tr></thead><tbody><tr>'+ra+'</tr><tr>'+rh+'</tr></tbody></table></div>';
+  var n=cols.length+1;
+  var h1='<tr class="g1"><th></th><th colspan="'+n+'" class="gl">Shots</th><th colspan="'+n+'" class="gl gr">Goals</th></tr>';
+  var h2='<tr><th>Team</th>';
+  var lbl=cols.map(function(c){return c[0]==='ot'?'OT':c[0];}).concat(['T']);
+  lbl.forEach(function(x){h2+='<th>'+x+'</th>';});
+  lbl.forEach(function(x,i){h2+='<th'+(i===0?' class="gr"':'')+'>'+x+'</th>';});
+  h2+='</tr>';
+  function row(side,ab,cls,total){
+    var r='<tr><td class="'+cls+'"><b>'+ab+'</b></td>';
+    cols.forEach(function(c){
+      var ok=status!=='pre'&&reached(R,c[0])&&(c[0]==='ot'||+c[0]<=(pd.number||1)||status==='final');
+      r+='<td>'+(ok?R.S[c[0]][side].sog:'-')+'</td>';
+    });
+    r+='<td class="tot"><b>'+R.S.all[side].sog+'</b></td>';
+    cols.forEach(function(c,i){
+      var ok=status!=='pre'&&reached(R,c[0])&&(c[0]==='ot'||+c[0]<=(pd.number||1)||status==='final');
+      r+='<td'+(i===0?' class="gr"':'')+'>'+(ok?R.S[c[0]][side].g:'-')+'</td>';
+    });
+    r+='<td class="tot"><b>'+total+'</b></td></tr>';
+    return r;
+  }
+  return '<div class="tw"><table class="ls"><thead>'+h1+h2+'</thead><tbody>'+row('a',an,'ta',sa)+row('h',hn,'tb',sh)+'</tbody></table></div>';
 }
 
 /* Section: shots and chances by period */
 function shotsByPeriod(R,an,hn){
   var cols=periodCols(R);
-  var metrics=[['Shots on goal',function(t){return t.sog;}],['Shot attempts (all)',att],['High danger chances',function(t){return t.hd;}],['Goals',function(t){return t.g;}]];
+  var metrics=[['Shot attempts (all)',att],['High danger chances',function(t){return t.hd;}]];
   var h='<th>Team</th>'+cols.map(function(c){return '<th>'+c[1]+'</th>';}).join('');
   var rows='';
   metrics.forEach(function(m){
@@ -509,8 +544,8 @@ function renderHTML(d,updatedText,ui){
     +statRow('Power play',tb.pen,ta.pen,ta.ppg+'/'+tb.pen,tb.ppg+'/'+ta.pen,false)
     +statRow('Penalty minutes',ta.pim,tb.pim,ta.pim,tb.pim,false)
     +'<p class="note">Shot attempts = shots on goal + missed + blocked. Power play chances are counted as penalties taken by the other team.</p></section>'
-    +'<section class="panel"><h2>Shots by period</h2><div style="margin-top:8px">'+shotsByPeriod(R,an,hn)+'</div>'
-    +'<p class="note">High danger = close-in unblocked attempts, estimated from shot location. See the Advanced tab for definitions.</p></section>';
+    +'<section class="panel"><h2>Attempts by period</h2><div style="margin-top:8px">'+shotsByPeriod(R,an,hn)+'</div>'
+    +'<p class="note">Shots on goal and goals by period are in the Score tab. High danger = close-in unblocked attempts, estimated from shot location (see Advanced tab).</p></section>';
   } else if(view==='adv'){
     var cfA=pct(att(ta),att(ta)+att(tb)), cfH=pct(att(tb),att(ta)+att(tb));
     var ffA=pct(unb(ta),unb(ta)+unb(tb)), ffH=pct(unb(tb),unb(ta)+unb(tb));
