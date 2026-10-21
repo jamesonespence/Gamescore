@@ -450,20 +450,50 @@ function start(){
   function showErr(msg){errEl.textContent=msg;errEl.hidden=false;}
   function clearErr(){errEl.hidden=true;}
   function schedule(ms){if(timer)clearTimeout(timer);if(ms)timer=setTimeout(load,ms);}
+  /* Routes: the NHL directly first, then public relays that add the browser permission headers. */
+  var ROUTES=[
+    {name:'direct',make:function(u){return u;}},
+    {name:'allorigins',make:function(u){return 'https://api.allorigins.win/raw?url='+encodeURIComponent(u+'?t='+Date.now());}},
+    {name:'codetabs',make:function(u){return 'https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(u+'?t='+Date.now());}},
+    {name:'corsproxy',make:function(u){return 'https://corsproxy.io/?url='+encodeURIComponent(u+'?t='+Date.now());}}
+  ];
+  var preferred=0;
+  function tryRoute(i){
+    var r=ROUTES[i], ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+    var to=setTimeout(function(){if(ctl)ctl.abort();},10000);
+    return fetch(r.make(URL_PBP),{cache:'no-store',signal:ctl?ctl.signal:undefined}).then(function(resp){
+      clearTimeout(to);
+      if(!resp.ok) throw new Error('HTTP '+resp.status);
+      return resp.json();
+    }).then(function(d){
+      if(!d||!d.gameState) throw new Error('unexpected data');
+      return {d:d,via:r.name};
+    },function(e){clearTimeout(to);throw e;});
+  }
+  function getData(){
+    var order=[preferred], errs=[], i;
+    for(i=0;i<ROUTES.length;i++) if(i!==preferred) order.push(i);
+    function next(k){
+      if(k>=order.length) return Promise.reject(new Error(errs.join('; ')));
+      return tryRoute(order[k]).then(function(res){preferred=order[k];return res;},function(e){
+        errs.push(ROUTES[order[k]].name+': '+(e&&e.message?e.message:'failed'));
+        return next(k+1);
+      });
+    }
+    return next(0);
+  }
   function load(){
     if(busy) return; busy=true;
-    fetch(URL_PBP,{cache:'no-store'}).then(function(r){
-      if(!r.ok) throw new Error('NHL data returned HTTP '+r.status);
-      return r.json();
-    }).then(function(d){
+    getData().then(function(res){
+      var d=res.d;
       var now=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});
-      app.innerHTML=renderHTML(d,'Updated '+now);
+      app.innerHTML=renderHTML(d,'Updated '+now+(res.via!=='direct'?' via '+res.via+' relay':''));
       var b=document.getElementById('refresh'); if(b) b.addEventListener('click',function(){load();});
       clearErr();
       var s=gameStatus(d);
       schedule(s==='final'?0:(s==='pre'?POLL_PRE:POLL_LIVE));
     }).catch(function(e){
-      showErr('Could not load live data ('+(e&&e.message?e.message:'network error')+'). Showing the last update if there is one. Retrying in 30 seconds. If this keeps happening, open this page in a regular browser tab from your own site rather than a preview.');
+      showErr('Could not load live data. Tried: '+(e&&e.message?e.message:'network error')+'. Retrying in 30 seconds.');
       schedule(POLL_LIVE);
     }).then(function(){busy=false;});
   }
