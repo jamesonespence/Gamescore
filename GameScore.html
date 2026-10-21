@@ -138,12 +138,26 @@ table.ls td.tot{background:var(--track)}
 .syncbar.bad{border-color:var(--err);background:var(--err-bg);color:var(--err)}
 table.pt th,table.pt td{padding:6px 3px;font-size:12.5px}
 table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;background:var(--surface);padding-left:0;padding-right:6px}
+.linkbtn{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;padding:4px 0;text-decoration:underline;cursor:pointer}
+.notes h3{font-size:18px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+.notes h4{margin:12px 0 2px;font-family:var(--f-disp);font-size:16px;letter-spacing:.04em}
+.notes ul{margin:2px 0 0;padding-left:18px;color:var(--fg);font-size:14px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.4</span><a href="https://github.com/jamesonespence/Gamescore/blob/main/RELEASE_NOTES.md" target="_blank" rel="noopener">Release notes</a></div>
+  <div class="verbar"><span>GameScore v1.6</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <section id="notes" class="panel notes" hidden>
+    <h3>Release notes</h3>
+    <h4>v1.6</h4><ul><li>Release notes are now built into the page. Tap "Release notes" at the top to open or close them.</li></ul>
+    <h4>v1.5</h4><ul><li>Finished games no longer show a growing "old" timer; the sync bar says the game is over and when the final stats were saved.</li></ul>
+    <h4>v1.4</h4><ul><li>Time on ice for every skater on the Players tab: total, power play (PP) and shorthanded (SH). PP and SH are estimates.</li><li>Version number at the top and a sync bar showing how far behind the data is.</li><li>Players tab shows every skater, sorted by points, shots, hits, blocks, faceoff wins and ice time.</li></ul>
+    <h4>v1.3</h4><ul><li>Game picker lists all NHL games from yesterday and today, grouped by day. Leafs games marked with * and sorted first.</li><li>Live games open automatically, Leafs first.</li></ul>
+    <h4>v1.2</h4><ul><li>Score summary: shots and goals by period in one row per team.</li><li>Scoring and penalties reorganized by period.</li><li>Stats tab: attempts and high danger chances by period.</li></ul>
+    <h4>v1.1</h4><ul><li>Button views (Score, Stats, Advanced, Players) and period buttons.</li><li>High danger chances, advanced stats by period, glossary.</li></ul>
+    <h4>v1.0</h4><ul><li>First self-updating card with game picker, fed by a GitHub copy of NHL data every 5 minutes.</li></ul>
+  </section>
   <div id="sync" class="syncbar" hidden></div>
   <div id="picker" class="pickrow" hidden></div>
   <div id="app"><section class="panel"><p id="boot" style="margin:0">Loading live data...</p></section></div>
@@ -799,9 +813,12 @@ function start(){
     else cls=age<=420?'ok':(age<=900?'warn':'bad');
     syncEl.className='syncbar'+(cls?' '+cls:'');
     syncEl.hidden=false;
-    syncEl.innerHTML='<span>Copied from NHL: <b>'+esc(clk(f))+'</b></span><span>Now: <b>'+esc(clk(now))+'</b></span><span>'+(st==='final'?'Final copy, '+dur(age)+' old':'Behind by: <b>'+dur(age)+'</b>')+'</span>';
+    if(st==='final') syncEl.innerHTML='<span>Game over. Final stats saved from the NHL at <b>'+esc(clk(f))+'</b>. No further updates needed.</span>';
+    else syncEl.innerHTML='<span>Copied from NHL: <b>'+esc(clk(f))+'</b></span><span>Now: <b>'+esc(clk(now))+'</b></span><span>Behind by: <b>'+dur(age)+'</b></span>';
   }
   setInterval(tick,1000);
+  var rb=document.getElementById('relbtn'), nt=document.getElementById('notes');
+  if(rb&&nt) rb.addEventListener('click',function(){var o=nt.hidden;nt.hidden=!o;rb.setAttribute('aria-expanded',o?'true':'false');});
   app.addEventListener('click',function(ev){
     var b=ev.target&&ev.target.closest?ev.target.closest('button'):null;
     if(!b) return;
