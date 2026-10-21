@@ -451,11 +451,10 @@ function start(){
   function clearErr(){errEl.hidden=true;}
   function schedule(ms){if(timer)clearTimeout(timer);if(ms)timer=setTimeout(load,ms);}
   /* Routes: the NHL directly first, then public relays that add the browser permission headers. */
+  var REPO_JSON='https://raw.githubusercontent.com/jamesonespence/Gamescore/main/data.json';
   var ROUTES=[
     {name:'direct',make:function(u){return u;}},
-    {name:'allorigins',make:function(u){return 'https://api.allorigins.win/raw?url='+encodeURIComponent(u+'?t='+Date.now());}},
-    {name:'codetabs',make:function(u){return 'https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(u+'?t='+Date.now());}},
-    {name:'corsproxy',make:function(u){return 'https://corsproxy.io/?url='+encodeURIComponent(u+'?t='+Date.now());}}
+    {name:'github',make:function(u){return REPO_JSON+'?t='+Date.now();}}
   ];
   var preferred=0;
   function tryRoute(i){
@@ -487,7 +486,13 @@ function start(){
     getData().then(function(res){
       var d=res.d;
       var now=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});
-      app.innerHTML=renderHTML(d,'Updated '+now+(res.via!=='direct'?' via '+res.via+' relay':''));
+      var note='Updated '+now;
+      if(res.via==='github'){
+        var ft='';
+        try{ft=d.fetchedAt?new Date(d.fetchedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';}catch(e){}
+        note+=' - using the GitHub copy of the NHL data'+(ft?', copied at '+ft:'')+', refreshed about every 5 minutes';
+      }
+      app.innerHTML=renderHTML(d,note);
       var b=document.getElementById('refresh'); if(b) b.addEventListener('click',function(){load();});
       clearErr();
       var s=gameStatus(d);
