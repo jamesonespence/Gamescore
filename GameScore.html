@@ -301,6 +301,10 @@ function analyze(d){
       pens.push({side:ps,per:n,time:p.timeInPeriod,who:cm?cm.name:'Bench',desc:det.descKey||'',dur:dur});
     }
   });
+  Object.keys(roster).forEach(function(id){
+    var r=roster[id]; if(r.pos==='G') return;
+    K=KEYS; eachP(+id,function(){});
+  });
   return {S:S,PL:PL,GK:GK,goals:goals,pens:pens,lastPer:lastPer,nPer:Math.max(3,lastPer),roster:roster};
 }
 
@@ -323,13 +327,11 @@ function playerTable(PLk,side){
   Object.keys(PLk).forEach(function(k){
     var p=PLk[k];
     if(p.side!==side) return;
-    if(p.g+p.a+p.sog+p.hits+p.blk+p.pim+p.fw+p.fl===0) return;
     arr.push(p);
   });
   arr.sort(function(x,y){
-    return ((y.g+y.a)-(x.g+x.a))||(y.sog-x.sog)||(y.hits-x.hits)||(y.blk-x.blk)||(y.fw-x.fw);
+    return ((y.g+y.a)-(x.g+x.a))||(y.sog-x.sog)||(y.hits-x.hits)||(y.blk-x.blk)||(y.fw-x.fw)||(x.last<y.last?-1:1);
   });
-  arr=arr.slice(0,8);
   if(!arr.length) return '<p class="note">No player events in this period yet.</p>';
   var rows=arr.map(function(p){
     var fo=(p.fw+p.fl)>0?(p.fw+'/'+(p.fw+p.fl)):'-';
@@ -616,7 +618,7 @@ function renderHTML(d,updatedText,ui){
     body='<section class="panel"><h2>Players</h2><p class="sub" style="margin:2px 0 0">Showing: '+esc(perName)+'</p>'
     +'<div class="cols" style="margin-top:12px"><div><h3 class="ta">'+an+' players</h3>'+playerTable(R.PL[per],'a')+goalieLines(R.GK[per],'a')+'</div>'
     +'<div><h3 class="tb">'+hn+' players</h3>'+playerTable(R.PL[per],'h')+goalieLines(R.GK[per],'h')+'</div></div>'
-    +'<p class="note">Top 8 skaters per team by points, shots, hits.</p></section>';
+    +'<p class="note">All skaters, sorted by points, then shots, hits, blocks and faceoff wins.</p></section>';
   }
 
   var title=esc(nd(A.commonName)||A.abbrev)+' at '+esc(nd(H.commonName)||H.abbrev);
