@@ -129,11 +129,22 @@ table.ls td.tot{background:var(--track)}
 .ev .l1{overflow-wrap:anywhere}
 .ev .l2{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
 .ev .tag{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px;color:var(--muted);vertical-align:1px}
+.verbar{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
+.verbar a{color:var(--muted)}
+.syncbar{font-size:13px;border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--surface);font-variant-numeric:tabular-nums;display:flex;flex-wrap:wrap;gap:4px 14px}
+.syncbar b{font-weight:600}
+.syncbar.ok{border-color:#2e9e5b}
+.syncbar.warn{border-color:#d99a00}
+.syncbar.bad{border-color:var(--err);background:var(--err-bg);color:var(--err)}
+table.pt th,table.pt td{padding:6px 3px;font-size:12.5px}
+table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;background:var(--surface);padding-left:0;padding-right:6px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
+  <div class="verbar"><span>GameScore v1.4</span><a href="https://github.com/jamesonespence/Gamescore/blob/main/RELEASE_NOTES.md" target="_blank" rel="noopener">Release notes</a></div>
+  <div id="sync" class="syncbar" hidden></div>
   <div id="picker" class="pickrow" hidden></div>
   <div id="app"><section class="panel"><p id="boot" style="margin:0">Loading live data...</p></section></div>
   <noscript><section class="panel">This card needs JavaScript to load live data.</section></noscript>
@@ -322,22 +333,46 @@ function statRow(label,a,b,fa,fb,lead){
     +'<div class="bar"><i class="a" style="width:'+wa.toFixed(1)+'%"></i><i class="b" style="width:'+(100-wa).toFixed(1)+'%"></i></div></div>';
 }
 
-function playerTable(PLk,side){
-  var arr=[];
+function fmtT(sec,dash){
+  if(sec==null) return '-';
+  if(!sec&&dash) return '-';
+  var m=Math.floor(sec/60), r=sec%60;
+  return m+':'+(r<10?'0':'')+r;
+}
+function toiFn(d,per){
+  var toi=d.toi||null, box=d.boxToi||null;
+  return function(id){
+    if(toi&&toi[id]){
+      var o=toi[id], keys=per==='all'?Object.keys(o):[per], t=[0,0,0];
+      keys.forEach(function(k){if(o[k]){t[0]+=o[k][0];t[1]+=o[k][1];t[2]+=o[k][2];}});
+      return t;
+    }
+    if(toi&&per!=='all') return [0,0,0];
+    if(box&&box[id]&&per==='all'){
+      var p=String(box[id]).split(':'); return [(+p[0])*60+(+p[1]||0),null,null];
+    }
+    return null;
+  };
+}
+function playerTable(PLk,side,tf){
+  var arr=[], any=false;
   Object.keys(PLk).forEach(function(k){
     var p=PLk[k];
     if(p.side!==side) return;
+    p.toi=tf?tf(p.id):null; if(p.toi) any=true;
     arr.push(p);
   });
   arr.sort(function(x,y){
-    return ((y.g+y.a)-(x.g+x.a))||(y.sog-x.sog)||(y.hits-x.hits)||(y.blk-x.blk)||(y.fw-x.fw)||(x.last<y.last?-1:1);
+    return ((y.g+y.a)-(x.g+x.a))||(y.sog-x.sog)||(y.hits-x.hits)||(y.blk-x.blk)||(y.fw-x.fw)||((y.toi?y.toi[0]:0)-(x.toi?x.toi[0]:0))||(x.last<y.last?-1:1);
   });
   if(!arr.length) return '<p class="note">No player events in this period yet.</p>';
   var rows=arr.map(function(p){
     var fo=(p.fw+p.fl)>0?(p.fw+'/'+(p.fw+p.fl)):'-';
-    return '<tr><td>'+esc(p.last)+'</td><td>'+p.g+'</td><td>'+p.a+'</td><td>'+p.sog+'</td><td>'+p.hits+'</td><td>'+p.blk+'</td><td>'+p.pim+'</td><td>'+fo+'</td></tr>';
+    var t=p.toi;
+    return '<tr><td>'+esc(p.last)+'</td><td>'+p.g+'</td><td>'+p.a+'</td><td>'+p.sog+'</td><td>'+p.hits+'</td><td>'+p.blk+'</td><td>'+p.pim+'</td><td>'+fo+'</td>'
+      +(any?'<td>'+(t?fmtT(t[0]):'-')+'</td><td>'+(t&&t[1]!=null?fmtT(t[1],true):'-')+'</td><td>'+(t&&t[2]!=null?fmtT(t[2],true):'-')+'</td>':'')+'</tr>';
   }).join('');
-  return '<div class="tw"><table><thead><tr><th>Player</th><th>G</th><th>A</th><th>SOG</th><th>Hit</th><th>Blk</th><th>PIM</th><th>FO</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  return '<div class="tw"><table class="pt"><thead><tr><th>Player</th><th>G</th><th>A</th><th>SOG</th><th>Hit</th><th>Blk</th><th>PIM</th><th>FO</th>'+(any?'<th>TOI</th><th>PP</th><th>SH</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
 function goalieLines(GKk,side){
@@ -615,10 +650,11 @@ function renderHTML(d,updatedText,ui){
       +'<p class="note">Each cell is '+an+' share - '+hn+' share, in percent. A dash means the period has not been played.</p></section>'
       +'<section class="panel">'+glossary()+'</section>';
   } else {
+    var tf=toiFn(d,per);
     body='<section class="panel"><h2>Players</h2><p class="sub" style="margin:2px 0 0">Showing: '+esc(perName)+'</p>'
-    +'<div class="cols" style="margin-top:12px"><div><h3 class="ta">'+an+' players</h3>'+playerTable(R.PL[per],'a')+goalieLines(R.GK[per],'a')+'</div>'
-    +'<div><h3 class="tb">'+hn+' players</h3>'+playerTable(R.PL[per],'h')+goalieLines(R.GK[per],'h')+'</div></div>'
-    +'<p class="note">All skaters, sorted by points, then shots, hits, blocks and faceoff wins.</p></section>';
+    +'<div class="cols" style="margin-top:12px"><div><h3 class="ta">'+an+' players</h3>'+playerTable(R.PL[per],'a',tf)+goalieLines(R.GK[per],'a')+'</div>'
+    +'<div><h3 class="tb">'+hn+' players</h3>'+playerTable(R.PL[per],'h',tf)+goalieLines(R.GK[per],'h')+'</div></div>'
+    +'<p class="note">All skaters, sorted by points, then shots, hits, blocks, faceoff wins and ice time. TOI = total time on ice, PP = on the power play, SH = shorthanded. PP and SH are estimated from shifts and play-by-play, so they can be off by a few seconds.</p></section>';
   }
 
   var title=esc(nd(A.commonName)||A.abbrev)+' at '+esc(nd(H.commonName)||H.abbrev);
@@ -739,6 +775,7 @@ function start(){
       try{ft=d.fetchedAt?new Date(d.fetchedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';}catch(e){}
       lastD=d; lastTxt='Updated '+now+' - using the GitHub copy of the NHL data'+(ft?', copied at '+ft:'')+', refreshed about every 5 minutes';
       app.innerHTML=renderHTML(d,lastTxt,ui);
+      tick();
       clearErr();
       var s=gameStatus(d);
       schedule(s==='final'?0:(s==='pre'?POLL_PRE:POLL_LIVE));
@@ -747,6 +784,24 @@ function start(){
       schedule(POLL_LIVE);
     }).then(function(){busy=false;});
   }
+  var syncEl=document.getElementById('sync');
+  function clk(dt){return dt.toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});}
+  function dur(sec){
+    sec=Math.max(0,Math.round(sec)); var m=Math.floor(sec/60), r=sec%60;
+    return m>0?(m+'m '+(r<10?'0':'')+r+'s'):(r+'s');
+  }
+  function tick(){
+    if(!syncEl||!lastD||!lastD.fetchedAt){return;}
+    var f=new Date(lastD.fetchedAt), now=new Date();
+    if(isNaN(f.getTime())) return;
+    var age=(now-f)/1000, st=gameStatus(lastD), cls;
+    if(st==='final') cls='';
+    else cls=age<=420?'ok':(age<=900?'warn':'bad');
+    syncEl.className='syncbar'+(cls?' '+cls:'');
+    syncEl.hidden=false;
+    syncEl.innerHTML='<span>Copied from NHL: <b>'+esc(clk(f))+'</b></span><span>Now: <b>'+esc(clk(now))+'</b></span><span>'+(st==='final'?'Final copy, '+dur(age)+' old':'Behind by: <b>'+dur(age)+'</b>')+'</span>';
+  }
+  setInterval(tick,1000);
   app.addEventListener('click',function(ev){
     var b=ev.target&&ev.target.closest?ev.target.closest('button'):null;
     if(!b) return;
