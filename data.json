@@ -2283,7 +2283,7 @@
         "yCoord": 12,
         "zoneCode": "O",
         "eventOwnerTeamId": 10,
-        "hittingPlayerId": 8478458,
+        "hittingPlayerId": 8475171,
         "hitteePlayerId": 8481161
       }
     },
@@ -7780,5 +7780,5 @@
   ],
   "regPeriods": 3,
   "summary": {},
-  "fetchedAt": "2026-10-21T14:00:05Z"
+  "fetchedAt": "2026-10-21T14:33:47Z"
 }
