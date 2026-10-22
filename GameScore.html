@@ -98,6 +98,7 @@ tr:last-child td{border-bottom:0}
 .nav{display:flex;flex-direction:column;gap:8px}
 .seg{display:flex;gap:6px}
 .segb{flex:1 1 0;min-width:0;font:inherit;font-weight:600;font-size:15px;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 4px;min-height:44px;cursor:pointer}
+.segb:disabled{opacity:.4;cursor:default}
 .segb.on{background:var(--chip);color:var(--chip-fg);border-color:var(--chip)}
 .segb:focus-visible{outline:2px solid var(--a);outline-offset:2px}
 .seg.sm .segb{min-height:38px;font-size:14px;padding:6px 4px}
@@ -147,9 +148,10 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.9</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <div class="verbar"><span>GameScore v1.10</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
   <section id="notes" class="panel notes" hidden>
     <h3>Release notes</h3>
+    <h4>v1.10</h4><ul><li>Period buttons for periods that have not started yet are now greyed out (before, tapping them silently snapped back to Total, which looked broken). They switch on as soon as the period starts. Footer refresh text corrected.</li></ul>
     <h4>v1.9</h4><ul><li>Fresher data: the page now asks GitHub's API for the live game file (the normal file server holds copies for about 3 minutes). It falls back to the file server automatically if the API is unavailable or its hourly limit is reached. The footer says which one was used.</li></ul>
     <h4>v1.8</h4><ul><li>Page now refreshes the moment you switch back to it (phones pause background tabs, which made the data look 3 minutes old).</li><li>Requests time out after 15 seconds and the refresh loop can no longer get stuck.</li></ul>
     <h4>v1.7</h4><ul><li>Much fresher data: the updater now stays running during games and re-fetches every 30 seconds instead of waiting for the slow GitHub schedule. Data is published to a separate branch so it does not clog the repo.</li></ul>
@@ -573,7 +575,8 @@ function renderHTML(d,updatedText,ui){
   if(view!=='score'){
     var pcs=[['all','Total'],['1','1st'],['2','2nd'],['3','3rd']]; if(R.nPer>3) pcs.push(['ot','OT']);
     perBtns='<div class="seg sm" role="group" aria-label="Period">'+pcs.map(function(c){
-      return '<button type="button" class="segb'+(per===c[0]?' on':'')+'" data-per="'+c[0]+'" aria-pressed="'+(per===c[0])+'">'+c[1]+'</button>';
+      var rc=reached(R,c[0]);
+      return '<button type="button" class="segb'+(per===c[0]?' on':'')+(rc?'':' off')+'"'+(rc?'':' disabled title="Not played yet"')+' data-per="'+c[0]+'" aria-pressed="'+(per===c[0])+'">'+c[1]+'</button>';
     }).join('')+'</div>';
   }
 
@@ -688,7 +691,7 @@ function renderHTML(d,updatedText,ui){
   +'</div><div class="bottom">'+head+'</div></section>'
   +'<div class="nav">'+viewBtns+perBtns+'</div>'
   +body
-  +'<p class="note" style="margin:0">Source: NHL play-by-play. '+(updatedText?esc(updatedText)+'. ':'')+(status==='final'?'Game over, refresh stopped.':'Refreshes every 30 seconds while the game is on.')+' Counts come from play events and can differ slightly from the official box score.</p>';
+  +'<p class="note" style="margin:0">Source: NHL play-by-play. '+(updatedText?esc(updatedText)+'. ':'')+(status==='final'?'Game over, refresh stopped.':'Refreshes about every 30 to 60 seconds while the game is on.')+' Counts come from play events and can differ slightly from the official box score.</p>';
 }
 
 /* ---- browser wiring ---- */
