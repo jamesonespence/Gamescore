@@ -147,9 +147,10 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.8</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <div class="verbar"><span>GameScore v1.9</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
   <section id="notes" class="panel notes" hidden>
     <h3>Release notes</h3>
+    <h4>v1.9</h4><ul><li>Fresher data: the page now asks GitHub's API for the live game file (the normal file server holds copies for about 3 minutes). It falls back to the file server automatically if the API is unavailable or its hourly limit is reached. The footer says which one was used.</li></ul>
     <h4>v1.8</h4><ul><li>Page now refreshes the moment you switch back to it (phones pause background tabs, which made the data look 3 minutes old).</li><li>Requests time out after 15 seconds and the refresh loop can no longer get stuck.</li></ul>
     <h4>v1.7</h4><ul><li>Much fresher data: the updater now stays running during games and re-fetches every 30 seconds instead of waiting for the slow GitHub schedule. Data is published to a separate branch so it does not clog the repo.</li></ul>
     <h4>v1.6</h4><ul><li>Release notes are now built into the page. Tap "Release notes" at the top to open or close them.</li></ul>
@@ -700,14 +701,43 @@ function start(){
   function showErr(msg){errEl.textContent=msg;errEl.hidden=false;}
   function clearErr(){errEl.hidden=true;}
   function schedule(ms){if(timer)clearTimeout(timer);timer=ms?setTimeout(load,ms):null;}
-  function getJSON(path){
-    var ac=(typeof AbortController!=='undefined')?new AbortController():null;
-    var tm=ac?setTimeout(function(){ac.abort();},15000):null;
+  var API='https://api.github.com/repos/jamesonespence/Gamescore/contents/';
+  var apiOffUntil=0, lastVia='file server';
+  function apiBudgetOk(){
+    if(Date.now()<apiOffUntil) return false;
+    try{
+      var arr=JSON.parse(localStorage.getItem('gs_api')||'[]'), cut=Date.now()-3600000;
+      arr=arr.filter(function(t){return t>cut;});
+      if(arr.length>=50) return false;
+      arr.push(Date.now()); localStorage.setItem('gs_api',JSON.stringify(arr));
+    }catch(e){}
+    return true;
+  }
+  function rawGet(path,ac,tm){
     return fetch(RAW+path+'?t='+Date.now(),ac?{cache:'no-store',signal:ac.signal}:{cache:'no-store'}).then(function(r){
       if(tm) clearTimeout(tm);
       if(!r.ok){var e=new Error('HTTP '+r.status);e.status=r.status;throw e;}
+      lastVia='file server';
       return r.json();
     });
+  }
+  function getJSON(path){
+    var ac=(typeof AbortController!=='undefined')?new AbortController():null;
+    var tm=ac?setTimeout(function(){ac.abort();},15000):null;
+    if(/^data\//.test(path)&&apiBudgetOk()){
+      return fetch(API+path+'?ref=data&t='+Date.now(),{cache:'no-store',headers:{'Accept':'application/vnd.github.raw'},signal:ac?ac.signal:undefined}).then(function(r){
+        if(r.ok){ if(tm) clearTimeout(tm); lastVia='GitHub API'; return r.json(); }
+        if(r.status===403||r.status===429) apiOffUntil=Date.now()+15*60000;
+        else if(r.status!==404) apiOffUntil=Date.now()+5*60000;
+        throw new Error('api '+r.status);
+      }).catch(function(e){
+        if(!/^api /.test(String(e&&e.message))) apiOffUntil=Date.now()+30*60000;
+        var ac2=(typeof AbortController!=='undefined')?new AbortController():null;
+        var tm2=ac2?setTimeout(function(){ac2.abort();},15000):null;
+        return rawGet(path,ac2,tm2);
+      });
+    }
+    return rawGet(path,ac,tm);
   }
   function isSaved(id){return saved.indexOf(Number(id))>=0;}
   function tm(g){
@@ -794,12 +824,12 @@ function start(){
       var now=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit',second:'2-digit'});
       var ft='';
       try{ft=d.fetchedAt?new Date(d.fetchedAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';}catch(e){}
-      lastD=d; lastTxt='Updated '+now+' - using the GitHub copy of the NHL data'+(ft?', copied at '+ft:'')+', refreshed about every 30 seconds during games';
+      lastD=d; lastTxt='Updated '+now+' - using the GitHub copy of the NHL data (via '+lastVia+')'+(ft?', copied at '+ft:'')+', refreshed about every 30-60 seconds during games';
       app.innerHTML=renderHTML(d,lastTxt,ui);
       tick();
       clearErr();
       var s=gameStatus(d);
-      schedule(s==='final'?0:(s==='pre'?POLL_PRE:POLL_LIVE));
+      schedule(s==='final'?0:(s==='pre'?POLL_PRE:(lastVia==='GitHub API'?62000:POLL_LIVE)));
     }).catch(function(e){
       showErr((e&&e.message?e.message:'Could not load the saved data')+' Retrying in 30 seconds.');
       schedule(POLL_LIVE);
