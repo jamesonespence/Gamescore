@@ -147,9 +147,10 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.7</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <div class="verbar"><span>GameScore v1.8</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
   <section id="notes" class="panel notes" hidden>
     <h3>Release notes</h3>
+    <h4>v1.8</h4><ul><li>Page now refreshes the moment you switch back to it (phones pause background tabs, which made the data look 3 minutes old).</li><li>Requests time out after 15 seconds and the refresh loop can no longer get stuck.</li></ul>
     <h4>v1.7</h4><ul><li>Much fresher data: the updater now stays running during games and re-fetches every 30 seconds instead of waiting for the slow GitHub schedule. Data is published to a separate branch so it does not clog the repo.</li></ul>
     <h4>v1.6</h4><ul><li>Release notes are now built into the page. Tap "Release notes" at the top to open or close them.</li></ul>
     <h4>v1.5</h4><ul><li>Finished games no longer show a growing "old" timer; the sync bar says the game is over and when the final stats were saved.</li></ul>
@@ -700,7 +701,10 @@ function start(){
   function clearErr(){errEl.hidden=true;}
   function schedule(ms){if(timer)clearTimeout(timer);timer=ms?setTimeout(load,ms):null;}
   function getJSON(path){
-    return fetch(RAW+path+'?t='+Date.now(),{cache:'no-store'}).then(function(r){
+    var ac=(typeof AbortController!=='undefined')?new AbortController():null;
+    var tm=ac?setTimeout(function(){ac.abort();},15000):null;
+    return fetch(RAW+path+'?t='+Date.now(),ac?{cache:'no-store',signal:ac.signal}:{cache:'no-store'}).then(function(r){
+      if(tm) clearTimeout(tm);
       if(!r.ok){var e=new Error('HTTP '+r.status);e.status=r.status;throw e;}
       return r.json();
     });
@@ -774,8 +778,10 @@ function start(){
       load();
     });
   }
+  var loadStart=0;
   function load(){
-    if(busy) return; busy=true;
+    if(busy&&(Date.now()-loadStart)<20000) return;
+    busy=true; loadStart=Date.now();
     getJSON('games.json').then(function(j){games=j.games||[];saved=j.saved||[];team=j.team||'';todayStr=j.today||'';},function(){games=null;}).then(function(){
       if(!sel) sel=autoPick();
       buildPicker();
@@ -818,6 +824,10 @@ function start(){
     else syncEl.innerHTML='<span>Copied from NHL: <b>'+esc(clk(f))+'</b></span><span>Now: <b>'+esc(clk(now))+'</b></span><span>Behind by: <b>'+dur(age)+'</b></span>';
   }
   setInterval(tick,1000);
+  function wake(){ if(!document.hidden && lastD && gameStatus(lastD)!=='final') load(); else if(!document.hidden && !lastD) load(); }
+  document.addEventListener('visibilitychange',wake);
+  window.addEventListener('focus',wake);
+  window.addEventListener('pageshow',wake);
   var rb=document.getElementById('relbtn'), nt=document.getElementById('notes');
   if(rb&&nt) rb.addEventListener('click',function(){var o=nt.hidden;nt.hidden=!o;rb.setAttribute('aria-expanded',o?'true':'false');});
   app.addEventListener('click',function(ev){
