@@ -161,9 +161,10 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.11</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <div class="verbar"><span>GameScore v1.12</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
   <section id="notes" class="panel notes" hidden>
     <h3>Release notes</h3>
+    <h4>v1.12</h4><ul><li>Goalies added to the box score: a goalie table under each team with shots against, saves, goals against, save %, high danger shots faced and saved, and time on ice (whole game; per-period time needs shift data).</li></ul>
     <h4>v1.11</h4><ul><li>Players view: one team per page. Tap the team buttons (away / home) to switch between full player tables, so no long scroll. Defaults to the Leafs when they are playing. Credit line added at the bottom.</li></ul>
     <h4>v1.10</h4><ul><li>Period buttons for periods that have not started yet are now greyed out (before, tapping them silently snapped back to Total, which looked broken). They switch on as soon as the period starts. Footer refresh text corrected.</li></ul>
     <h4>v1.9</h4><ul><li>Fresher data: the page now asks GitHub's API for the live game file (the normal file server holds copies for about 3 minutes). It falls back to the file server automatically if the API is unavailable or its hourly limit is reached. The footer says which one was used.</li></ul>
@@ -281,7 +282,7 @@ function analyze(d){
   function eachG(id,fn){
     if(!id) return;
     K.forEach(function(k){
-      if(!GK[k][id]){var r=roster[id]||{};GK[k][id]={id:id,side:ids[r.team]||'a',name:r.name||('#'+id),last:r.last||('#'+id),saves:0,ga:0};}
+      if(!GK[k][id]){var r=roster[id]||{};GK[k][id]={id:id,side:ids[r.team]||'a',name:r.name||('#'+id),last:r.last||('#'+id),saves:0,ga:0,hdsa:0,hdga:0};}
       fn(GK[k][id]);
     });
   }
@@ -304,8 +305,8 @@ function analyze(d){
       });
       if(kind==='sog') eachP(shooter,function(x){x.sog++;});
       if(det.goalieInNetId){
-        if(t==='goal') eachG(det.goalieInNetId,function(g){g.ga++;});
-        else if(t==='shot-on-goal') eachG(det.goalieInNetId,function(g){g.saves++;});
+        if(t==='goal') eachG(det.goalieInNetId,function(g){g.ga++; if(hd){g.hdsa++;g.hdga++;}});
+        else if(t==='shot-on-goal') eachG(det.goalieInNetId,function(g){g.saves++; if(hd)g.hdsa++;});
       }
       if(t==='goal'){
         eachT(s,function(x){x.g++; if(st==='pp')x.ppg++;});
@@ -353,8 +354,8 @@ function analyze(d){
     }
   });
   Object.keys(roster).forEach(function(id){
-    var r=roster[id]; if(r.pos==='G') return;
-    K=KEYS; eachP(+id,function(){});
+    var r=roster[id]; K=KEYS;
+    if(r.pos==='G') eachG(+id,function(){}); else eachP(+id,function(){});
   });
   return {S:S,PL:PL,GK:GK,goals:goals,pens:pens,lastPer:lastPer,nPer:Math.max(3,lastPer),roster:roster};
 }
@@ -413,6 +414,25 @@ function playerTable(PLk,side,tf){
       +(any?'<td>'+(t?fmtT(t[0]):'-')+'</td><td>'+(t&&t[1]!=null?fmtT(t[1],true):'-')+'</td><td>'+(t&&t[2]!=null?fmtT(t[2],true):'-')+'</td>':'')+'</tr>';
   }).join('');
   return '<div class="tw"><table class="pt"><thead><tr><th>Player</th><th>G</th><th>A</th><th>SOG</th><th>Hit</th><th>Blk</th><th>PIM</th><th>FO</th>'+(any?'<th>TOI</th><th>PP</th><th>SH</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+function goalieTable(GKk,side,tf){
+  var arr=[], seen={};
+  Object.keys(GKk).forEach(function(k){
+    var g=GKk[k]; if(g.side!==side) return;
+    seen[g.id]=1; arr.push(g);
+  });
+  arr=arr.filter(function(g){return (g.saves+g.ga)>0||(tf&&tf(g.id)&&tf(g.id)[0]>0);});
+  if(!arr.length) return '';
+  arr.sort(function(x,y){return ((y.saves+y.ga)-(x.saves+x.ga))||(x.last<y.last?-1:1);});
+  var rows=arr.map(function(g){
+    var sa=g.saves+g.ga, sv=sa?(g.saves/sa).toFixed(3).replace(/^0/,''):'-';
+    var hs=g.hdsa-g.hdga;
+    var t=tf?tf(g.id):null;
+    return '<tr><td>'+esc(g.last)+'</td><td>'+sa+'</td><td>'+g.saves+'</td><td>'+g.ga+'</td><td>'+sv+'</td><td>'+g.hdsa+'</td><td>'+hs+'</td><td>'+(t?fmtT(t[0]):'-')+'</td></tr>';
+  }).join('');
+  return '<h3 class="h3m" style="margin-top:16px">Goalies</h3><div class="tw"><table class="pt"><thead><tr><th>Goalie</th><th>SA</th><th>SV</th><th>GA</th><th>SV%</th><th>HD SA</th><th>HD SV</th><th>TOI</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<p class="note">SA = shots against, SV = saves, GA = goals against, HD = high danger chances faced.</p>';
 }
 
 function goalieLines(GKk,side){
@@ -695,7 +715,7 @@ function renderHTML(d,updatedText,ui){
     var tm=ui.team||(String(hn).toUpperCase()==='TOR'?'h':(String(an).toUpperCase()==='TOR'?'a':'a'));
     body='<section class="panel"><h2>Players</h2><p class="sub" style="margin:2px 0 0">Showing: '+esc(perName)+'</p>'
     +'<div class="jump" role="group" aria-label="Team"><button type="button" class="segb ja'+(tm==='a'?' on':'')+'" data-team="a" aria-pressed="'+(tm==='a')+'">'+an+'</button><button type="button" class="segb jb'+(tm==='h'?' on':'')+'" data-team="h" aria-pressed="'+(tm==='h')+'">'+hn+'</button></div>'
-    +'<div style="margin-top:12px"><h3 class="'+(tm==='a'?'ta':'tb')+'" style="font-size:16px;letter-spacing:.08em;margin:0 0 6px;text-transform:uppercase">'+(tm==='a'?an:hn)+' players</h3>'+playerTable(R.PL[per],tm,tf)+goalieLines(R.GK[per],tm)+'</div>'
+    +'<div style="margin-top:12px"><h3 class="'+(tm==='a'?'ta':'tb')+'" style="font-size:16px;letter-spacing:.08em;margin:0 0 6px;text-transform:uppercase">'+(tm==='a'?an:hn)+' players</h3>'+playerTable(R.PL[per],tm,tf)+goalieTable(R.GK[per],tm,tf)+'</div>'
     +'<p class="note">All skaters, sorted by points, then shots, hits, blocks, faceoff wins and ice time. TOI = total time on ice, PP = on the power play, SH = shorthanded. PP and SH are estimated from shifts and play-by-play, so they can be off by a few seconds.</p></section>';
   }
 
