@@ -104,7 +104,13 @@ tr:last-child td{border-bottom:0}
 .jump .jb{color:var(--b);border-color:var(--b)}
 .jump .segb.on.ja{background:var(--a);color:#fff}
 .jump .segb.on.jb{background:var(--b);color:#fff}
-.credit{margin:22px 0 8px;padding-top:12px;border-top:1px solid var(--line);text-align:center;font-family:var(--f-disp);font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.credit{margin:28px 0 12px;padding:0 0 6px;text-align:center;color:var(--muted)}
+.credit .cr-rule{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--a),var(--b));opacity:.85;margin:0 auto 18px;max-width:320px}
+.credit .cr-mark{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;border:2px solid var(--line);background:var(--surface);font-family:var(--f-disp);font-weight:800;font-size:19px;letter-spacing:.04em;color:var(--fg);box-shadow:0 0 0 4px var(--bg),0 0 0 5px var(--line)}
+.credit .cr-by{margin-top:12px;font-size:11px;letter-spacing:.28em;text-transform:uppercase}
+.credit .cr-name{margin-top:2px;font-family:var(--f-disp);font-weight:800;font-size:30px;line-height:1.1;letter-spacing:.07em;text-transform:uppercase;color:var(--fg)}
+.credit .cr-date{margin-top:6px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:12px;letter-spacing:.22em;text-transform:uppercase}
+.credit .cr-date:before,.credit .cr-date:after{content:"";width:34px;height:1px;background:var(--line)}
 .segb:disabled{opacity:.4;cursor:default}
 .segb.on{background:var(--chip);color:var(--chip-fg);border-color:var(--chip)}
 .segb:focus-visible{outline:2px solid var(--a);outline-offset:2px}
@@ -175,7 +181,13 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
   <div id="picker" class="pickrow" hidden></div>
   <div id="app"><section class="panel"><p id="boot" style="margin:0">Loading live data...</p></section></div>
   <noscript><section class="panel">This card needs JavaScript to load live data.</section></noscript>
-  <footer class="credit">Designed and built by Jameson Spence - October 2026</footer>
+  <footer class="credit" aria-label="Credit">
+    <div class="cr-rule"></div>
+    <div class="cr-mark">JS</div>
+    <div class="cr-by">Designed and built by</div>
+    <div class="cr-name">Jameson Spence</div>
+    <div class="cr-date">October 2026</div>
+  </footer>
 </div>
 <script>
 (function(){
