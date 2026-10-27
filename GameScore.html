@@ -153,6 +153,8 @@ table.ls td.tot{background:var(--track)}
 table.lu{table-layout:fixed}
 table.lu th,table.lu td{padding:7px 3px;font-size:13px;text-align:left;vertical-align:top}
 table.lu th:first-child,table.lu td:first-child{width:46px;color:var(--muted);font-weight:600}
+table.lu.sx td,table.lu.sx th{white-space:nowrap;font-size:12.5px}
+table.lu.sx th:first-child,table.lu.sx td:first-child{width:84px;color:var(--fg)}
 table.lu .lun{display:block;font-weight:600;overflow-wrap:anywhere}
 table.lu .lus{display:block;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .badge{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;padding:2px 7px;border:1px solid var(--line)}
@@ -160,6 +162,14 @@ table.lu .lus{display:block;font-size:11.5px;color:var(--muted);font-variant-num
 .badge.pj{border-color:#d99a00;color:#d99a00}
 .chg{margin:8px 0 0;padding:0;list-style:none;font-size:13.5px}
 .chg li{padding:2px 0}
+.lub{display:block;width:100%;text-align:left;background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.lub .lun{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.lub:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 0}
+.sgrid div{border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.sgrid b{display:block;font-family:var(--f-disp);font-size:22px;letter-spacing:.03em}
+.sgrid span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.bioline{margin:6px 0 0;font-size:14px;color:var(--muted)}
 table.pt th,table.pt td{padding:6px 3px;font-size:12.5px}
 table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;background:var(--surface);padding-left:0;padding-right:6px}
 .linkbtn{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;padding:4px 0;text-decoration:underline;cursor:pointer}
@@ -171,9 +181,10 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.15</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <div class="verbar"><span>GameScore v1.16</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
   <section id="notes" class="panel notes" hidden>
     <h3>Release notes</h3>
+    <h4>v1.16</h4><ul><li>Player cards: tap any player on the Lineup tab to open a card with height, weight, shot hand, age, birthplace, draft, this season's numbers, season by season history and career totals. Goalies get games, record, GAA, save % and shutouts. Tap Back to lineup to return.</li><li>Injury labels cleaned up (IR, Day-to-day).</li></ul>
     <h4>v1.15</h4><ul><li>New Lineup tab: forward lines, defense pairs, goalies, power play unit and injuries for both teams, plus a side-by-side matchup. The card is prepared ahead of time (7 AM, after the morning skate, 30 minutes before puck drop) and replaced with the real dressed lineup right after puck drop. It opens on the Lineup tab before a game and switches to Score when the game starts.</li><li>Every card shows whether it is projected or confirmed, where the lines came from and when it was prepared.</li></ul>
     <h4>v1.14</h4><ul><li>Faster updates: the page now reads game data through a Cloudflare relay about every 10 seconds (the old GitHub route is the automatic backup). The footer says which one was used.</li><li>Before a game starts, the red "Behind by" bar is replaced by a calm "Waiting for puck drop" message.</li></ul>
     <h4>v1.13</h4><ul><li>During an intermission the big clock now says what it is counting: the time left until the next period starts (it used to just say 16:01 with no explanation).</li></ul>
@@ -603,6 +614,7 @@ function luP(t,id){
   if(typeof id==='string') return {n:id.replace(/^n:/,''),gp:0,none:true};
   return (t.players&&t.players[String(id)])||null;
 }
+var luAb='';
 function luCell(t,id,goalie){
   var p=luP(t,id);
   if(!p) return '<span class="lun">-</span>';
@@ -612,13 +624,76 @@ function luCell(t,id,goalie){
     if(goalie) st=u+(p.gp||0)+' GP';
     else st=u+(p.gp||0)+' GP '+(p.g||0)+'-'+(p.a||0)+'-'+(p.p||0);
   }
-  return '<span class="lun">'+esc(luName(p.n))+'</span><span class="lus">'+esc(st)+'</span>';
+  var inner='<span class="lun">'+esc(luName(p.n))+'</span><span class="lus">'+esc(st)+'</span>';
+  if(p.none||typeof id!=='number') return inner;
+  return '<button type="button" class="lub" data-pl="'+esc(luAb)+':'+id+'">'+inner+'</button>';
 }
 function luPpg(t,ids){
   var s=0,n=0;
   ids.forEach(function(id){var p=luP(t,id); if(p&&!p.none&&p.gp>0){s+=(p.p||0)/p.gp;n++;}});
   return n?s:null;
 }
+
+function seasonLbl(c){c=String(c||'');return c.length===8?(c.slice(0,4)+'-'+c.slice(6)):c;}
+function ageOf(dob,ref){
+  try{var b=new Date(dob), r=ref?new Date(ref):new Date(); var a=r.getFullYear()-b.getFullYear(); var m=r.getMonth()-b.getMonth(); if(m<0||(m===0&&r.getDate()<b.getDate())) a--; return isNaN(a)?null:a;}catch(e){return null;}
+}
+function sheetHTML(d,t,ab,id){
+  var p=t.players[id], b=p.bio||null, goalie=p.ps==='G';
+  var cur=String(d.season||'');
+  if(!cur){var dt=new Date(d.startTimeUTC||Date.now()); var y=dt.getFullYear()-(dt.getMonth()<8?1:0); cur=String(y)+String(y+1);}
+  var pos={C:'Center',L:'Left wing',R:'Right wing',D:'Defense',G:'Goalie',F:'Forward'}[p.ps]||p.ps||'';
+  var bits=[];
+  if(b){
+    if(b.ht) bits.push(Math.floor(b.ht/12)+"'"+(b.ht%12)+'" '+(b.wt?b.wt+' lb':''));
+    if(b.sh) bits.push((goalie?'Catches ':'Shoots ')+b.sh);
+    var ag=ageOf(b.dob,d.startTimeUTC); if(ag!=null) bits.push('Age '+ag);
+    if(b.bp) bits.push('Born '+b.bp);
+    bits.push(b.dr?('Drafted '+b.dr[0]+', round '+b.dr[1]+', #'+b.dr[2]+(b.dr[3]?(' by '+b.dr[3]):'')):'Undrafted');
+  }
+  var tm=ab===(d.awayTeam&&d.awayTeam.abbrev)?'ta':'tb';
+  var h='<section class="panel"><button type="button" class="btn" data-sheetx="1" style="margin-bottom:10px">Back to lineup</button>'
+   +'<h2 class="'+tm+'">'+esc(p.n)+'</h2><div class="sub" style="margin-top:2px">'+(p.u!=null?'#'+p.u+' - ':'')+esc(pos)+' - '+esc(ab)+'</div>'
+   +(bits.length?'<p class="bioline">'+esc(bits.join(' | '))+'</p>':'');
+  var sg=function(v,l){return '<div><b>'+v+'</b><span>'+l+'</span></div>';};
+  var gp=p.gp||0, grid='';
+  if(goalie){
+    grid='<div class="sgrid">'+sg(gp,'GP')+sg(p.gs!=null?p.gs:'-','Starts')+sg((p.w||0)+'-'+(p.l||0)+'-'+(p.o||0),'W-L-OT')+sg(p.gaa!=null?(+p.gaa).toFixed(2):'-','GAA')+sg(p.sv!=null?(+p.sv).toFixed(3).replace(/^0/,''):'-','SV%')+sg(p.so||0,'Shutouts')+'</div>';
+  } else {
+    var ppg=gp?((p.p||0)/gp).toFixed(2):'-', shp=(p.sog>0)?((p.g||0)/p.sog*100).toFixed(1)+'%':'-';
+    var toi=p.toi?(Math.floor(p.toi/60)+':'+('0'+(p.toi%60)).slice(-2)):'-';
+    grid='<div class="sgrid">'+sg(gp,'GP')+sg(p.g||0,'Goals')+sg(p.a||0,'Assists')+sg(p.p||0,'Points')+sg(ppg,'Pts/GP')+sg(p.pm>0?'+'+p.pm:(p.pm||0),'+/-')+sg(p.pim||0,'PIM')+sg(p.sog||0,'Shots')+sg(shp,'Shot %')+sg(toi,'TOI/GP')+(p.fo!=null&&p.ps==='C'?sg(p.fo.toFixed(1)+'%','Faceoff %'):'')+'</div>';
+  }
+  h+='<h3 class="h3m">This season</h3>'+grid;
+  /* season table */
+  var rows=[], prev=[];
+  var ss=(b&&b.ss)||[];
+  ss.forEach(function(r){ if(String(r.s)!==cur) prev.push(r); });
+  var cells=function(r){
+    if(goalie) return '<td>'+r.gp+'</td><td>'+(r.w||0)+'-'+(r.l||0)+'-'+(r.o||0)+'</td><td>'+(r.gaa!=null?(+r.gaa).toFixed(2):'-')+'</td><td>'+(r.sv!=null?(+r.sv).toFixed(3).replace(/^0/,''):'-')+'</td><td>'+(r.so||0)+'</td>';
+    return '<td>'+r.gp+'</td><td>'+r.g+'</td><td>'+r.a+'</td><td>'+r.p+'</td><td>'+(r.pm>0?'+'+r.pm:r.pm)+'</td><td>'+r.pim+'</td>';
+  };
+  var head=goalie?'<th>Season</th><th>GP</th><th>W-L-OT</th><th>GAA</th><th>SV%</th><th>SO</th>':'<th>Season</th><th>GP</th><th>G</th><th>A</th><th>P</th><th>+/-</th><th>PIM</th>';
+  var body='<tr><td><b>'+seasonLbl(cur)+'</b></td>'+cells({gp:gp,g:p.g||0,a:p.a||0,p:p.p||0,pm:p.pm||0,pim:p.pim||0,w:p.w,l:p.l,o:p.o,gaa:p.gaa,sv:p.sv,so:p.so})+'</tr>';
+  prev.slice(0,2).forEach(function(r){body+='<tr><td>'+seasonLbl(r.s)+'</td>'+cells(r)+'</tr>';});
+  if(b&&b.car&&b.car.gp) body+='<tr><td><b>Career</b></td>'+cells(b.car)+'</tr>';
+  h+='<h3 class="h3m">Season by season</h3><div class="tw"><table class="lu sx"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+  /* reads */
+  var rd=[];
+  if(!goalie&&prev.length&&prev[0].gp>=20&&gp>=5){
+    var pn=gp?(p.p||0)/gp:0, pl=prev[0].p/prev[0].gp, df=pn-pl;
+    rd.push('Scoring pace: '+pn.toFixed(2)+' points per game this season against '+pl.toFixed(2)+' in '+seasonLbl(prev[0].s)+(Math.abs(df)<=0.08?' (steady).':(df>0?' (up).':' (down).')));
+    var pm1=gp?(p.pim||0)/gp:0;
+    rd.push('Penalty minutes: '+pm1.toFixed(2)+' per game this season'+(prev[0].gp?(', '+(prev[0].pim/prev[0].gp).toFixed(2)+' last season.'):'.'));
+  }
+  if(goalie&&prev.length&&prev[0].gp>=10&&p.sv!=null&&prev[0].sv!=null){
+    rd.push('Save percentage '+(+p.sv).toFixed(3).replace(/^0/,'')+' this season against '+(+prev[0].sv).toFixed(3).replace(/^0/,'')+' in '+seasonLbl(prev[0].s)+'.');
+  }
+  if(rd.length) h+='<ul class="read">'+rd.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>';
+  h+='<p class="note">Regular season NHL numbers only. Players traded during a season are combined. Current season comes from the NHL team stats, so it can lag the latest game by a few minutes.</p></section>';
+  return h;
+}
+
 function lineupHTML(d,ui,an,hn,tm,status){
   var L=d.lineup;
   if(!L||!L.teams){
@@ -626,6 +701,8 @@ function lineupHTML(d,ui,an,hn,tm,status){
   }
   var A=L.teams[an], H=L.teams[hn];
   var ab=tm==='a'?an:hn, t=tm==='a'?A:H;
+  luAb=ab;
+  if(ui.sheet){var sp=String(ui.sheet).split(':'), sT=L.teams[sp[0]]; if(sT&&sT.players&&sT.players[sp[1]]) return sheetHTML(d,sT,sp[0],sp[1]);}
   var conf=L.status==='confirmed';
   var built='';
   try{built=new Date(L.builtAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});}catch(e){}
@@ -659,7 +736,7 @@ function lineupHTML(d,ui,an,hn,tm,status){
   var out='';
   if((t.out&&t.out.length)||(t.scr&&t.scr.length)){
     out='<h3 class="'+cls+'" style="'+h3+'">Out and injured</h3><ul class="chg">'
-     +(t.out||[]).map(function(o){var p=luP(t,o.id);return '<li><b>'+esc(p?p.n:o.name)+'</b> - '+esc(o.st||'Out')+'</li>';}).join('')
+     +(t.out||[]).map(function(o){var p=luP(t,o.id);var stt=String(o.st||'Out'), stl=stt.toLowerCase(); stt=stl==='ir'?'IR':(stl==='ltir'?'LTIR':(stl==='dtd'?'Day-to-day':stt)); return '<li><b>'+esc(p?p.n:o.name)+'</b> - '+esc(stt)+'</li>';}).join('')
      +(t.scr||[]).map(function(o){var p=luP(t,o.id);return '<li><b>'+esc(p?p.n:o.name)+'</b> - scratch</li>';}).join('')+'</ul>';
   }
   var chg='';
@@ -994,7 +1071,7 @@ function start(){
     pickEl.innerHTML='<label for="gamepick" class="sub">Game</label><select id="gamepick">'+opts+'</select>';
     pickEl.hidden=false;
     document.getElementById('gamepick').addEventListener('change',function(ev){
-      sel=ev.target.value; ui.touched=false;
+      sel=ev.target.value; ui.touched=false; ui.sheet=null;
       try{history.replaceState(null,'','?game='+sel);}catch(e){}
       load();
     });
@@ -1059,10 +1136,12 @@ function start(){
     if(!b) return;
     if(b.id==='refresh'){load();return;}
     var ch=false;
-    if(b.getAttribute('data-view')){ui.view=b.getAttribute('data-view');ui.touched=true;ch=true;}
+    if(b.getAttribute('data-pl')){ui.sheet=b.getAttribute('data-pl');ui.touched=true;ch=true;}
+    if(b.getAttribute('data-sheetx')){ui.sheet=null;ch=true;}
+    if(b.getAttribute('data-view')){ui.view=b.getAttribute('data-view');ui.touched=true;ui.sheet=null;ch=true;}
     if(b.getAttribute('data-team')){ui.team=b.getAttribute('data-team');ch=true;}
     if(b.getAttribute('data-per')){ui.per=b.getAttribute('data-per');ch=true;}
-    if(ch&&lastD){app.innerHTML=renderHTML(lastD,lastTxt,ui);}
+    if(ch&&lastD){app.innerHTML=renderHTML(lastD,lastTxt,ui); if(b.getAttribute('data-pl')||b.getAttribute('data-sheetx')){try{window.scrollTo(0,0);}catch(e){}}}
   });
   load();
 }
