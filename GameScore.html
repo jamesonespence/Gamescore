@@ -167,10 +167,10 @@ table.lu .lus{display:block;font-size:11.5px;color:var(--muted);font-variant-num
 .lub:hover,.lub:active{border-color:var(--a);background:var(--track)}
 table.lu td:has(.lub){padding:4px 3px}
 .lub:focus-visible{outline:2px solid var(--a);outline-offset:2px}
-.sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 0}
-.sgrid div{border:1px solid var(--line);border-radius:6px;padding:8px 10px}
-.sgrid b{display:block;font-family:var(--f-disp);font-size:22px;letter-spacing:.03em}
-.sgrid span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(54px,1fr));gap:6px;margin:8px 0 0}
+.sgrid div{border:1px solid var(--line);border-radius:6px;padding:5px 7px}
+.sgrid b{display:block;font-family:var(--f-disp);font-size:17px;letter-spacing:.03em;line-height:1.2}
+.sgrid span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .bioline{margin:6px 0 0;font-size:14px;color:var(--muted)}
 table.pt th,table.pt td{padding:6px 3px;font-size:12.5px}
 table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;background:var(--surface);padding-left:0;padding-right:6px}
@@ -183,9 +183,10 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.18</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <div class="verbar"><span>GameScore v1.19</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
   <section id="notes" class="panel notes" hidden>
     <h3>Release notes</h3>
+    <h4>v1.19</h4><ul><li>Player cards: the season summary at the top is now a compact strip (points per game, shots, shot %, ice time, faceoff %) since the table below already has games, goals, assists, points, +/- and penalty minutes.</li></ul>
     <h4>v1.18</h4><ul><li>Player cards now show every NHL season, not just the last two, plus career totals.</li></ul>
     <h4>v1.17</h4><ul><li>Players on the Lineup tab now sit in bordered boxes so it is clear they can be tapped.</li></ul>
     <h4>v1.16</h4><ul><li>Player cards: tap any player on the Lineup tab to open a card with height, weight, shot hand, age, birthplace, draft, this season's numbers, season by season history and career totals. Goalies get games, record, GAA, save % and shutouts. Tap Back to lineup to return.</li><li>Injury labels cleaned up (IR, Day-to-day).</li></ul>
@@ -662,13 +663,13 @@ function sheetHTML(d,t,ab,id){
   var sg=function(v,l){return '<div><b>'+v+'</b><span>'+l+'</span></div>';};
   var gp=p.gp||0, grid='';
   if(goalie){
-    grid='<div class="sgrid">'+sg(gp,'GP')+sg(p.gs!=null?p.gs:'-','Starts')+sg((p.w||0)+'-'+(p.l||0)+'-'+(p.o||0),'W-L-OT')+sg(p.gaa!=null?(+p.gaa).toFixed(2):'-','GAA')+sg(p.sv!=null?(+p.sv).toFixed(3).replace(/^0/,''):'-','SV%')+sg(p.so||0,'Shutouts')+'</div>';
+    grid='<div class="sgrid">'+sg(p.gs!=null?p.gs:'-','Starts')+'</div>';
   } else {
     var ppg=gp?((p.p||0)/gp).toFixed(2):'-', shp=(p.sog>0)?((p.g||0)/p.sog*100).toFixed(1)+'%':'-';
     var toi=p.toi?(Math.floor(p.toi/60)+':'+('0'+(p.toi%60)).slice(-2)):'-';
-    grid='<div class="sgrid">'+sg(gp,'GP')+sg(p.g||0,'Goals')+sg(p.a||0,'Assists')+sg(p.p||0,'Points')+sg(ppg,'Pts/GP')+sg(p.pm>0?'+'+p.pm:(p.pm||0),'+/-')+sg(p.pim||0,'PIM')+sg(p.sog||0,'Shots')+sg(shp,'Shot %')+sg(toi,'TOI/GP')+(p.fo!=null&&p.ps==='C'?sg(p.fo.toFixed(1)+'%','Faceoff %'):'')+'</div>';
+    grid='<div class="sgrid">'+sg(ppg,'Pts/GP')+sg(p.sog||0,'Shots')+sg(shp,'Shot %')+sg(toi,'TOI/GP')+(p.fo!=null&&p.ps==='C'?sg(p.fo.toFixed(1)+'%','FO %'):'')+'</div>';
   }
-  h+='<h3 class="h3m">This season</h3>'+grid;
+  h+=grid;
   /* season table */
   var rows=[], prev=[];
   var ss=(b&&b.ss)||[];
