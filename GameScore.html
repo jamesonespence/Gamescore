@@ -153,7 +153,11 @@ table.ls td.tot{background:var(--track)}
 table.lu{table-layout:fixed}
 table.lu th,table.lu td{padding:7px 3px;font-size:13px;text-align:left;vertical-align:top}
 table.lu th:first-child,table.lu td:first-child{width:46px;color:var(--muted);font-weight:600}
-table.lu.gk th:nth-child(2),table.lu.gk td:nth-child(2){width:46%}
+.nilg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}
+table.lu.gk th:nth-child(2),table.lu.gk td:nth-child(2){width:36%}
+.nilg .lun{display:block;font-weight:600}
+.nilg .lus{display:block;font-size:11.5px;color:var(--muted)}
+table.lu.gk td{white-space:nowrap}
 table.lu.sx td,table.lu.sx th{white-space:nowrap;font-size:12.5px}
 table.lu.sx th:first-child,table.lu.sx td:first-child{width:84px;color:var(--fg)}
 table.lu .lun{display:block;font-weight:600;overflow-wrap:anywhere}
@@ -183,9 +187,11 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.19</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <div class="verbar"><span>GameScore v1.21</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
   <section id="notes" class="panel notes" hidden>
     <h3>Release notes</h3>
+    <h4>v1.21</h4><ul><li>Players tab: 5v5 Corsi for each skater (CF-CA and CF%): shot attempts for and against the player's team while he was on the ice at 5 on 5. Works for the whole game and each period. Needs the new updater; older games show a dash.</li></ul>
+    <h4>v1.20</h4><ul><li>New "Not in the lineup" list under each team: regulars who have played this season but are missing from the projected lines (so a player like an injured captain is visible even when the lineup source does not list him as injured). After puck drop it becomes "Not dressed".</li></ul>
     <h4>v1.19</h4><ul><li>Player cards: the season summary at the top is now a compact strip (points per game, shots, shot %, ice time, faceoff %) since the table below already has games, goals, assists, points, +/- and penalty minutes.</li></ul>
     <h4>v1.18</h4><ul><li>Player cards now show every NHL season, not just the last two, plus career totals.</li></ul>
     <h4>v1.17</h4><ul><li>Players on the Lineup tab now sit in bordered boxes so it is clear they can be tapped.</li></ul>
@@ -424,12 +430,23 @@ function toiFn(d,per){
     return null;
   };
 }
-function playerTable(PLk,side,tf){
-  var arr=[], any=false;
+function cfFn(d,per){
+  var cf=d.cf5||null;
+  return function(id){
+    if(!cf) return null;
+    var o=cf[id]; if(!o) return per==='all'?null:[0,0];
+    var keys=per==='all'?Object.keys(o):[per], t=[0,0];
+    keys.forEach(function(k){if(o[k]){t[0]+=o[k][0];t[1]+=o[k][1];}});
+    return t;
+  };
+}
+function playerTable(PLk,side,tf,cff){
+  var arr=[], any=false, anyC=false;
   Object.keys(PLk).forEach(function(k){
     var p=PLk[k];
     if(p.side!==side) return;
     p.toi=tf?tf(p.id):null; if(p.toi) any=true;
+    p.cf=cff?cff(p.id):null; if(p.cf) anyC=true;
     arr.push(p);
   });
   arr.sort(function(x,y){
@@ -440,9 +457,10 @@ function playerTable(PLk,side,tf){
     var fo=(p.fw+p.fl)>0?(p.fw+'/'+(p.fw+p.fl)):'-';
     var t=p.toi;
     return '<tr><td>'+esc(p.last)+'</td><td>'+p.g+'</td><td>'+p.a+'</td><td>'+p.sog+'</td><td>'+p.hits+'</td><td>'+p.blk+'</td><td>'+p.pim+'</td><td>'+fo+'</td>'
-      +(any?'<td>'+(t?fmtT(t[0]):'-')+'</td><td>'+(t&&t[1]!=null?fmtT(t[1],true):'-')+'</td><td>'+(t&&t[2]!=null?fmtT(t[2],true):'-')+'</td>':'')+'</tr>';
+      +(any?'<td>'+(t?fmtT(t[0]):'-')+'</td><td>'+(t&&t[1]!=null?fmtT(t[1],true):'-')+'</td><td>'+(t&&t[2]!=null?fmtT(t[2],true):'-')+'</td>':'')
+      +(anyC?(p.cf?('<td>'+p.cf[0]+'-'+p.cf[1]+'</td><td>'+((p.cf[0]+p.cf[1])>0?Math.round(p.cf[0]/(p.cf[0]+p.cf[1])*100)+'%':'-')+'</td>'):'<td>-</td><td>-</td>'):'')+'</tr>';
   }).join('');
-  return '<div class="tw"><table class="pt"><thead><tr><th>Player</th><th>G</th><th>A</th><th>SOG</th><th>Hit</th><th>Blk</th><th>PIM</th><th>FO</th>'+(any?'<th>TOI</th><th>PP</th><th>SH</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  return '<div class="tw"><table class="pt"><thead><tr><th>Player</th><th>G</th><th>A</th><th>SOG</th><th>Hit</th><th>Blk</th><th>PIM</th><th>FO</th>'+(any?'<th>TOI</th><th>PP</th><th>SH</th>':'')+(anyC?'<th>CF-CA</th><th>CF%</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
 function goalieTable(GKk,side,tf){
@@ -728,7 +746,7 @@ function lineupHTML(d,ui,an,hn,tm,status){
    +(t.F||[]).map(function(ln,i){return '<tr><td>L'+(i+1)+'</td>'+ln.map(function(id){return '<td>'+luCell(t,id)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';
   var df='<h3 class="'+cls+'" style="'+h3+'">Defense</h3><div class="tw"><table class="lu"><thead><tr><th></th><th>Left</th><th>Right</th></tr></thead><tbody>'
    +(t.D||[]).map(function(ln,i){return '<tr><td>P'+(i+1)+'</td>'+ln.map(function(id){return '<td>'+luCell(t,id)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>';
-  var gk='<h3 class="'+cls+'" style="'+h3+'">Goalies</h3><div class="tw"><table class="lu gk"><thead><tr><th></th><th>Goalie</th><th>Record</th><th>GAA</th><th>SV%</th></tr></thead><tbody>'
+  var gk='<h3 class="'+cls+'" style="'+h3+'">Goalies</h3><div class="tw"><table class="lu gk"><thead><tr><th></th><th>Goalie</th><th>W-L-OT</th><th>GAA</th><th>SV%</th></tr></thead><tbody>'
    +(t.G||[]).map(function(id,i){
       var p=luP(t,id); if(!p) return '';
       var rec=p.none?'-':((p.w||0)+'-'+(p.l||0)+'-'+(p.o||0));
@@ -749,7 +767,11 @@ function lineupHTML(d,ui,an,hn,tm,status){
     chg='<h3 class="'+cls+'" style="'+h3+'">Changes from the projection</h3><ul class="chg">'+t.changes.map(function(c){return '<li>'+esc(c)+'</li>';}).join('')+'</ul>';
   }
   var src='<p class="note">Source: '+esc(t.src||'')+(asOf?(' (updated '+esc(asOf)+')'):'')+'. Stats are this season only: games played, then goals-assists-points.'+(t.extra&&t.extra.length?' '+t.extra.length+' extra dressed player(s) not in a line slot.':'')+'</p>';
-  var card=head+sm+fw+df+gk+pp+out+chg+src+'</section>';
+  var nilh='';
+  if(t.nil&&t.nil.length){
+    nilh='<h3 class="'+cls+'" style="'+h3+'">'+(conf?'Not dressed':'Not in the lineup')+'</h3><p class="sub" style="margin:0 0 6px">Regulars missing from the lines. The source does not always say why (injury, scratch or other), so check the news for the reason.</p><div class="nilg">'+t.nil.map(function(id){return '<div>'+luCell(t,id)+'</div>';}).join('')+'</div>';
+  }
+  var card=head+sm+fw+df+gk+pp+out+nilh+chg+src+'</section>';
 
   /* matchup */
   var mu='';
@@ -923,8 +945,8 @@ function renderHTML(d,updatedText,ui){
     var tm=ui.team||(String(hn).toUpperCase()==='TOR'?'h':(String(an).toUpperCase()==='TOR'?'a':'a'));
     body='<section class="panel"><h2>Players</h2><p class="sub" style="margin:2px 0 0">Showing: '+esc(perName)+'</p>'
     +'<div class="jump" role="group" aria-label="Team"><button type="button" class="segb ja'+(tm==='a'?' on':'')+'" data-team="a" aria-pressed="'+(tm==='a')+'">'+an+'</button><button type="button" class="segb jb'+(tm==='h'?' on':'')+'" data-team="h" aria-pressed="'+(tm==='h')+'">'+hn+'</button></div>'
-    +'<div style="margin-top:12px"><h3 class="'+(tm==='a'?'ta':'tb')+'" style="font-size:16px;letter-spacing:.08em;margin:0 0 6px;text-transform:uppercase">'+(tm==='a'?an:hn)+' players</h3>'+playerTable(R.PL[per],tm,tf)+goalieTable(R.GK[per],tm,tf)+'</div>'
-    +'<p class="note">All skaters, sorted by points, then shots, hits, blocks, faceoff wins and ice time. TOI = total time on ice, PP = on the power play, SH = shorthanded. PP and SH are estimated from shifts and play-by-play, so they can be off by a few seconds.</p></section>';
+    +'<div style="margin-top:12px"><h3 class="'+(tm==='a'?'ta':'tb')+'" style="font-size:16px;letter-spacing:.08em;margin:0 0 6px;text-transform:uppercase">'+(tm==='a'?an:hn)+' players</h3>'+playerTable(R.PL[per],tm,tf,cfFn(d,per))+goalieTable(R.GK[per],tm,tf)+'</div>'
+    +'<p class="note">All skaters, sorted by points, then shots, hits, blocks, faceoff wins and ice time. TOI = total time on ice, PP = on the power play, SH = shorthanded. CF-CA = 5v5 shot attempts (shots, misses, blocks) by the team while the player was on the ice, for and against; CF% is the share for. Counted from shift times, so it can be off by an event at a shift change. PP and SH are estimated from shifts and play-by-play, so they can be off by a few seconds.</p></section>';
   }
 
   var title=esc(nd(A.commonName)||A.abbrev)+' at '+esc(nd(H.commonName)||H.abbrev);
