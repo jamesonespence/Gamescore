@@ -192,6 +192,59 @@ jobs:
                   for pid in out:
                       for k in out[pid]:
                           out[pid][k] = [int(round(x)) for x in out[pid][k]]
+                  try:
+                      team_of = {}
+                      for rs in d.get('rosterSpots') or []:
+                          team_of[rs.get('playerId')] = rs.get('teamId')
+                      evs = []
+                      for pl in d.get('plays') or []:
+                          pdd = pl.get('periodDescriptor') or {}
+                          if pdd.get('periodType') == 'SO':
+                              continue
+                          tt = pl.get('typeDescKey')
+                          if tt not in ('goal', 'shot-on-goal', 'missed-shot', 'blocked-shot'):
+                              continue
+                          code = pl.get('situationCode') or ''
+                          if code != '1551':
+                              continue
+                          det = pl.get('details') or {}
+                          own = det.get('eventOwnerTeamId')
+                          if tt == 'blocked-shot':
+                              sp = det.get('shootingPlayerId')
+                              tm_ = team_of.get(sp)
+                              if tm_ is None and own is not None:
+                                  tm_ = d['homeTeam']['id'] if own == d['awayTeam']['id'] else d['awayTeam']['id']
+                              own = tm_
+                          if own is None:
+                              continue
+                          per_ = pdd.get('number', 1)
+                          evs.append(((per_ - 1) * 1200 + mmss(pl.get('timeInPeriod')), own, per_))
+                      cfo = {}
+                      for r in rows:
+                          if r.get('typeCode') != 517 or not r.get('playerId'):
+                              continue
+                          per = r.get('period') or 1
+                          base = (per - 1) * 1200
+                          s0 = base + mmss(r.get('startTime'))
+                          e0 = base + mmss(r.get('endTime'))
+                          if e0 <= s0:
+                              continue
+                          key = str(per) if per <= 3 else 'ot'
+                          tid = r.get('teamId')
+                          rec = cfo.setdefault(str(r['playerId']), {}).setdefault(key, [0, 0])
+                          for (te, own, per_) in evs:
+                              if per_ != per:
+                                  continue
+                              if s0 < te <= e0:
+                                  if own == tid:
+                                      rec[0] += 1
+                                  else:
+                                      rec[1] += 1
+                      if cfo:
+                          d['cf5'] = cfo
+                      print('Corsi players', len(cfo), 'events', len(evs))
+                  except Exception as ce:
+                      print('Corsi failed', gid, ce)
                   if out:
                       d['toi'] = out
                   print('Shift rows', len(rows), 'players with TOI', len(out))
@@ -496,9 +549,22 @@ jobs:
               return set(x for x in s if not isinstance(x, str))
 
 
+          def compute_nil(used, roster, stats):
+              c = []
+              for pid in roster:
+                  if pid in used:
+                      continue
+                  st = stats.get(pid)
+                  if st and (st.get('gp') or 0) >= 3:
+                      c.append((st.get('gp') or 0, st.get('toi') or 0, pid))
+              c.sort(reverse=True)
+              return [x[2] for x in c][:8]
+
+
           def finish_team(abbr, t, st, stats, roster):
               players = {}
-              for pid in ids_in(t):
+              t['nil'] = compute_nil(ids_in(t), roster, stats)
+              for pid in list(ids_in(t)) + list(t['nil']):
                   r = stats.get(pid)
                   ro = roster.get(pid) or {}
                   if r:
@@ -731,6 +797,14 @@ jobs:
                   if stage == 4:
                       apply_dressed(t, dr[ab])
                       stats = team_stats(ab)
+                      t['nil'] = compute_nil(set(dr[ab].keys()), team_roster(ab), stats)
+                      for pid in t['nil']:
+                          if str(pid) not in t['players']:
+                              q = dict(stats.get(pid) or {})
+                              inf = player_info(pid)
+                              if inf:
+                                  q['bio'] = inf
+                              t['players'][str(pid)] = q
                       for pid, r in dr[ab].items():
                           q = t['players'].get(str(pid))
                           if q is None:
@@ -847,7 +921,7 @@ jobs:
                   final = g['state'] in ('OFF', 'FINAL')
                   if live:
                       active = True
-                  elif not final and sd is not None and now - timedelta(hours=1) <= sd <= now + timedelta(minutes=20):
+                  elif not final and sd is not None and now - timedelta(hours=1) <= sd <= now + timedelta(minutes=60):
                       active = True
                   if saved_final(path):
                       continue
