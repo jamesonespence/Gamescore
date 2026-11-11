@@ -187,9 +187,10 @@ table.pt th:first-child,table.pt td:first-child{position:sticky;left:0;backgroun
 <body>
 <div class="wrap">
   <div id="err" class="err" hidden></div>
-  <div class="verbar"><span>GameScore v1.21</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
+  <div class="verbar"><span>GameScore v1.22</span><button type="button" id="relbtn" class="linkbtn" aria-expanded="false">Release notes</button></div>
   <section id="notes" class="panel notes" hidden>
     <h3>Release notes</h3>
+    <h4>v1.22</h4><ul><li>Advanced tab: estimated time of possession and possession share, for the game and by period. The NHL does not publish possession time, so it is estimated from play-by-play (see the glossary).</li></ul>
     <h4>v1.21</h4><ul><li>Players tab: 5v5 Corsi for each skater (CF-CA and CF%): shot attempts for and against the player's team while he was on the ice at 5 on 5. Works for the whole game and each period. Needs the new updater; older games show a dash.</li></ul>
     <h4>v1.20</h4><ul><li>New "Not in the lineup" list under each team: regulars who have played this season but are missing from the projected lines (so a player like an injured captain is visible even when the lineup source does not list him as injured). After puck drop it becomes "Not dressed".</li></ul>
     <h4>v1.19</h4><ul><li>Player cards: the season summary at the top is now a compact strip (points per game, shots, shot %, ice time, faceoff %) since the table below already has games, goals, assists, points, +/- and penalty minutes.</li></ul>
@@ -271,7 +272,7 @@ var KEYS=['all','1','2','3','ot'];
 
 function mkSt(){return {sog:0,miss:0,blk:0,fw:0,fl:0};}
 function mkTeam(){
-  return {g:0,sog:0,miss:0,blkAtt:0,blocks:0,hits:0,gv:0,tk:0,fw:0,fl:0,pen:0,pim:0,ppg:0,hd:0,hdsog:0,hdg:0,
+  return {g:0,sog:0,miss:0,blkAtt:0,blocks:0,hits:0,gv:0,tk:0,fw:0,fl:0,pen:0,pim:0,ppg:0,hd:0,hdsog:0,hdg:0,poss:0,
     st:{ev:mkSt(),pp:mkSt(),sh:mkSt()}, f5:{sog:0,miss:0,blk:0}};
 }
 function bump(t,state,five,kind){
@@ -302,7 +303,7 @@ function analyze(d){
   });
   var S={}, PL={}, GK={};
   KEYS.forEach(function(k){S[k]={a:mkTeam(),h:mkTeam()};PL[k]={};GK[k]={};});
-  var goals=[], pens=[], lastPer=1, K=['all','1'];
+  var goals=[], pens=[], lastPer=1, K=['all','1'], posPrev=null, POSS_CAP=40;
   function eachT(side,fn){K.forEach(function(k){fn(S[k][side]);});}
   function eachP(id,fn){
     if(!id) return;
@@ -328,6 +329,20 @@ function analyze(d){
     if(n>lastPer) lastPer=n;
     K=['all',pk(n)];
     var os=ids[det.eventOwnerTeamId], s, st, five;
+    /* Estimated possession: the time since the last event counts for the team that last controlled the puck. */
+    var tp=String(p.timeInPeriod||'0:0').split(':'), tabs=(n-1)*1200+(+tp[0]||0)*60+(+tp[1]||0);
+    if(posPrev&&posPrev.per===n&&posPrev.side){
+      var dtp=tabs-posPrev.t;
+      if(dtp>0){ if(dtp>POSS_CAP) dtp=POSS_CAP; S.all[posPrev.side].poss+=dtp; S[pk(n)][posPrev.side].poss+=dtp; }
+    }
+    var pside=posPrev&&posPrev.per===n?posPrev.side:null;
+    if(t==='faceoff'){ pside=os||null; }
+    else if(t==='takeaway'){ pside=os||null; }
+    else if(t==='giveaway'){ pside=os?other(os):null; }
+    else if(t==='shot-on-goal'||t==='missed-shot'){ pside=os||pside; }
+    else if(t==='blocked-shot'){ var bp=roster[det.blockingPlayerId]; pside=bp?ids[bp.team]:(os||pside); }
+    else if(t==='goal'||t==='stoppage'||t==='penalty'||t==='period-end'||t==='period-start'||t==='game-end'||t==='shootout-complete'){ pside=null; }
+    posPrev={per:n,t:tabs,side:pside};
     if(t==='goal'||t==='shot-on-goal'||t==='missed-shot'){
       s=os; if(!s) return;
       st=stateFor(code,s); five=is5v5(code);
@@ -623,6 +638,7 @@ function glossary(){
   +'<dt>For % (Corsi / Fenwick)</dt><dd>A team\'s share of the attempts while both teams are on the ice. Over 50% means that team is generating more of the play.</dd>'
   +'<dt>5v5</dt><dd>Only plays with five skaters and a goalie per side. Removes power-play noise.</dd>'
   +'<dt>High danger chance</dt><dd>An unblocked attempt in the offensive zone within about 25 feet of the net and not from a sharp angle (roughly the slot). Estimated from shot location, so it will not match other sites exactly. Blocked shots are not counted.</dd>'
+  +'<dt>Est. time of possession</dt><dd>The NHL does not track possession time, so this is an estimate from play-by-play. Time between events counts for the team that last won a faceoff, took the puck away, forced a giveaway, took a shot or blocked one. Stoppages, goals and penalties stop the clock, and any gap over 40 seconds is capped. Treat it as a rough guide, not an official number.</dd>'
   +'<dt>PDO</dt><dd>Shooting % plus save %. Near 100 is normal; far above or below usually means luck is swinging the score.</dd>'
   +'</dl></details>';
 }
@@ -888,7 +904,9 @@ function renderHTML(d,updatedText,ui){
       var bx=bold&&x!=null&&y!=null&&x>y, by=bold&&x!=null&&y!=null&&y>x;
       return '<tr><td>'+label+'</td><td>'+(bx?'<b class="ta">':'')+fx+(bx?'</b>':'')+'</td><td>'+(by?'<b class="tb">':'')+fy+(by?'</b>':'')+'</td></tr>';
     };
+    var pTot=ta.poss+tb.poss, poA=pct(ta.poss,pTot), poH=pct(tb.poss,pTot);
     var adv='<div class="tw"><table><thead><tr><th>Metric</th><th>'+an+'</th><th>'+hn+'</th></tr></thead><tbody>'
+      +(pTot>0?pr('Est. time of possession',ta.poss,tb.poss,fmtT(Math.round(ta.poss)),fmtT(Math.round(tb.poss)),true)+pr('Est. possession share',poA,poH,f1(poA),f1(poH),true):'')
       +pr('Shot attempts (Corsi)',0,0,att(ta),att(tb),false)
       +pr('Corsi for %',cfA,cfH,f1(cfA),f1(cfH),true)
       +pr('Unblocked attempts (Fenwick)',0,0,unb(ta),unb(tb),false)
@@ -927,6 +945,7 @@ function renderHTML(d,updatedText,ui){
       var t=x[2], ppU=u(t.st.pp);
       if(unb(t)>=3&&ppU>0) read.push('<li><b>'+x[1]+'</b>: '+ppU+' of its '+unb(t)+' unblocked attempts came on the power play.</li>');
     });
+    if(pTot>0) read.push('<li><b>Possession (estimate):</b> '+an+' '+fmtT(Math.round(ta.poss))+' ('+f1(poA)+'), '+hn+' '+fmtT(Math.round(tb.poss))+' ('+f1(poH)+') of tracked play time.</li>');
     if(att5(ta)+att5(tb)>0) read.push('<li><b>5v5:</b> '+an+' has '+att5(ta)+' attempts to '+att5(tb)+' for '+hn+' ('+f1(c5A)+' Corsi for '+an+').</li>');
     if(ta.hd+tb.hd>0) read.push('<li><b>High danger:</b> '+an+' '+ta.hd+', '+hn+' '+tb.hd+' ('+ta.hdg+' and '+tb.hdg+' of them went in).</li>');
     if(ta.gv+tb.gv>0) read.push('<li><b>Puck management:</b> '+an+' '+ta.gv+' giveaways and '+ta.tk+' takeaways, '+hn+' '+tb.gv+' giveaways and '+tb.tk+' takeaways.</li>');
