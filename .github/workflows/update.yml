@@ -955,6 +955,8 @@ jobs:
                                       d['toi'] = old['toi']
                                   if old.get('boxToi'):
                                       d['boxToi'] = old['boxToi']
+                                  if old.get('cf5'):
+                                      d['cf5'] = old['cf5']
                                   d['toiAt'] = ta
                                   reuse = True
                           except Exception:
